@@ -76,5 +76,8 @@ Inductive Simple: (Proc -> Hist) -> Mem -> Prop :=
 Theorem specIsSc:
   forall h s n m, Spec h s n m -> Simple h m.
 Proof.
-  admit.
+  intros;
+    match goal with
+      | H: Spec _ _ _ _ |- _ => induction H; try constructor; assumption
+    end.
 Qed.
