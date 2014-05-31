@@ -70,17 +70,17 @@ Parameter m0: Mem.
 
 Inductive Sc: forall h s n, Spec h s n -> Mem -> Prop :=
 | ScInit: Sc SpecInit m0
-| ScSpecLd: forall p h s n a (prev: Spec h s n) m, Sc (SpecLd p a prev) m
-| ScSpecSt: forall p h s n a v (prev: Spec h s n) m, Sc (SpecSt p a v prev) m
+| ScSpecLd: forall p h s n a (prev: Spec h s n) m, Sc prev m -> Sc (SpecLd p a prev) m
+| ScSpecSt: forall p h s n a v (prev: Spec h s n) m, Sc prev m -> Sc (SpecSt p a v prev) m
 | ScSpecFl: forall p h s n a (prev: Spec h s n) (mtch: nGet (n p) (s p) = Some (Sld a)) m,
-              Sc (SpecFl p (m a) prev mtch) m
+              Sc prev m -> Sc (SpecFl p (m a) prev mtch) m
 | ScCLd: forall p h s n a v' (prev: Spec h s n) (mtch: nGet (n p) (s p) = Some (Sfl a v'))
                 (pg: prog p (h p) = Load a) m,
-           Sc (CLd (m a) prev mtch pg) m
+           Sc prev m -> Sc (CLd (m a) prev mtch pg) m
 | ScCSt: forall p h s n a v (prev: Spec h s n) (mtch: nGet (n p) (s p) = Some (Sst a v))
                 (pg: prog p (h p) = Store a v) m,
-           Sc (CSt prev mtch pg) (updM a v m)
-| ScKill: forall p h s n n' (prev: Spec h s n) m, Sc (Kill p n' prev) m.
+           Sc prev m -> Sc (CSt prev mtch pg) (updM a v m)
+| ScKill: forall p h s n n' (prev: Spec h s n) m, Sc prev m -> Sc (Kill p n' prev) m.
 
 Inductive Simple: (Proc -> Hist) -> Mem -> Prop :=
 | Init: Simple (fun p => nil) m0
@@ -90,5 +90,8 @@ Inductive Simple: (Proc -> Hist) -> Mem -> Prop :=
 Theorem specIsSc:
   forall h s n (p: Spec h s n) m, Sc p m -> Simple h m.
 Proof.
-  admit.
+  intros;
+    match goal with
+      | H: Sc _ _ |- _ => induction H ; try constructor; intuition
+    end.
 Qed.
