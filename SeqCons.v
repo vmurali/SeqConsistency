@@ -44,6 +44,7 @@ Section StoreAtomicity.
                    end
     }.
 
+(*
       storeAtomicity:
         forall t,
           match respFn t with
@@ -66,4 +67,5 @@ Section StoreAtomicity.
             | _ => True
           end
   }.
+*)
 End StoreAtomicity.
