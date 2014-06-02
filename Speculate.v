@@ -210,3 +210,5 @@ Proof.
 
   common x IHSpec.
 Qed.
+
+End GivenProg.
