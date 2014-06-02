@@ -1,5 +1,3 @@
-Require Import BaseTree Tree.
-
 Set Implicit Arguments.
 
 Definition Time := nat.
@@ -14,18 +12,8 @@ Inductive Desc := Ld | St.
 Parameter Data: Set.
 Axiom decData: forall (d1 d2: Data), {d1 = d2} + {d1 <> d2}.
 
-Parameter bHier : BaseTree.
-
-Definition hier := getC nil bHier.
-Opaque hier.
-
-Record Cache := { node: Tree;
-                  def: descendent node hier }.
-
-Record Proc := { proc: Cache;
-                 isLeaf: leaf (node proc) }.
-
-Definition p_node x := node (proc x).
+Parameter Proc: Set.
+Axiom decProc: forall (p1 p2: Proc), {p1 = p2} + {p1 <> p2}.
 
 Record Req := { desc: Desc;
                 addr: Addr;
@@ -39,3 +27,5 @@ Record Resp := { procR: Proc;
 
 Parameter reqFn: Proc -> Index -> Req.
 Parameter initData: Addr -> Data.
+
+Definition Tag := nat.
