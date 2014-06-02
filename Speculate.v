@@ -5,8 +5,6 @@ Require Import List.
 Require Import Arith.
 Require Import Tree.
 
-Parameter Op: Set.
-
 Inductive Req :=
 | LdReq: nat -> Addr -> Req
 | StReq: Addr -> Data -> Req.
@@ -33,12 +31,14 @@ Inductive SElem :=
 
 Definition SHist := list (nat * SElem).
 
+Axiom decProc: forall (p1 p2: Proc), {p1 = p2} + {p1 <> p2}.
+
 Section GivenProg.
   Variable prog: Proc -> Hist -> Inst.
   Variable m0: Mem.
 
   Definition mod A st p (new: A) p' :=
-    if decTree (p_node p) (p_node p') then new else st p'.
+    if decProc p p' then new else st p'.
 
   Record PerProcState :=
     { hist: Hist;
@@ -115,7 +115,7 @@ Section GivenProg.
                     oldest (spec stp) = Some (n', (Sst a v)) ->
                     prog p (hist' stp) = Store a v ->
                     Spec (mod st p (Build_PerProcSpecState (St a v :: hist' stp) (rmS (spec stp) n') (tag stp) (StReq a v :: qs' stp) (rs' stp))) m
-  | SpecStAbort: forall st m p n',
+  | SpecAbort: forall st m p n',
                    let stp := st p in
                    Spec st m ->
                    Spec (mod st p (Build_PerProcSpecState (hist' stp) (rmS (spec stp) n')
@@ -126,21 +126,87 @@ Theorem specIsSc:
 Proof.
   intros.
   induction H.
-  exists (fun p => Build_PerProcState nil nil nil); intuition; constructor.
+  Ltac common x IHSpec := (try exists (fun p => Build_PerProcState nil nil nil); intuition; constructor)
+    || (
+    destruct IHSpec;
+    exists x;
+    constructor;
+    [ intros;
+      unfold mod;
+      match goal with
+        | _: _ |- context [decProc ?p ?p0] =>
+          destruct (decProc p p0) as [e | n]; simpl; intuition;
+          rewrite <- e in *;
+          match goal with
+            | H1: forall p: Proc, _ = _ |- _ => specialize (H1 p)
+          end;
+          intuition
+      end| 
+      intuition]).
+
+  common x IHSpec.
+  common x IHSpec.
+  common x IHSpec.
+
   destruct IHSpec.
-  exists x.
-  constructor; intros.
-  unfold mod.
-  destruct (decTree (p_node p) (p_node p0)); simpl; intuition.
-  specualize  (
-  simpl.
-  intuition.
-  constructor.
+  destruct H2.
+  pose proof (H2 p) as K.
+  unfold stp in H1.
+  rewrite K in H1.
+  pose proof (NormalLd H3 H1).
+  exists (mod x p
+              {|
+                hist := Ld a (m a) :: hist (x p);
+                qs := LdReq 0 a :: qs (x p);
+                rs := LdResp 0 (m a) :: rs (x p) |}).
   constructor.
   intros.
-  
-  intros;
-    match goal with
-      | H: Spec _ _ _ _ |- _ => induction H; try constructor; assumption
-    end.
+  unfold mod.
+  destruct (decProc p p0); simpl; intuition.
+  unfold stp.
+  rewrite K.
+  reflexivity.
+  intuition.
+
+  destruct IHSpec.
+  destruct H3.
+  pose proof (H3 p) as K.
+  unfold stp in H2.
+  rewrite K in H2.
+  pose proof (NormalLd H4 H2).
+  exists (mod x p
+              {|
+                hist := Ld a (m a) :: hist (x p);
+                qs := LdReq 0 a :: qs (x p);
+                rs := LdResp 0 (m a) :: rs (x p) |}).
+  constructor.
+  intros.
+  unfold mod.
+  destruct (decProc p p0); simpl; intuition.
+  unfold stp.
+  rewrite K.
+  reflexivity.
+  intuition.
+
+  destruct IHSpec.
+  destruct H2.
+  pose proof (H2 p) as K.
+  unfold stp in H1.
+  rewrite K in H1.
+  pose proof (NormalSt H3 H1).
+  exists (mod x p
+              {|
+                hist := St a v :: hist (x p);
+                qs := StReq a v :: qs (x p);
+                rs := rs (x p) |}).
+  constructor.
+  intros.
+  unfold mod.
+  destruct (decProc p p0); simpl; intuition.
+  unfold stp.
+  rewrite K.
+  reflexivity.
+  intuition.
+
+  common x IHSpec.
 Qed.
