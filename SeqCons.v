@@ -3,7 +3,19 @@ Require Import DataTypes.
 Set Implicit Arguments.
 
 Section SeqCons.
+  Record Req := { desc: Desc;
+                  addr: Addr;
+                  dataQ: Data
+                }.
+
+  Record Resp := { procR: Proc;
+                   idx: Index;
+                   datum: Data
+                 }.
+
   Variable respFn: Time -> option Resp.
+
+  Parameter reqFn: Proc -> Index -> Req.
 
   Definition noStore a t :=
     match respFn t with
