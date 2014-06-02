@@ -124,11 +124,11 @@ Proof.
   Ltac comm IHSpec :=
     destruct IHSpec as [x [r1 r2]];
     match goal with
-      | p: Proc , stp: PerProcSpecState |- _ => pose proof (r1 p) as K; unfold stp in *; rewrite K in *
+      | p: Proc , stp: PerProcSpecState |- _ => let K := fresh in pose proof (r1 p) as K; unfold stp in *; rewrite K in *
     end;
     match goal with
-      | H: prog _ _ = Load _ |- _ => pose proof (NormalLd r2 H) as new
-      | H: prog _ _ = Store _ _ |- _ => pose proof (NormalSt r2 H) as new
+      | H: prog _ _ = Load _ |- _ => pose proof (NormalLd r2 H)
+      | H: prog _ _ = Store _ _ |- _ => pose proof (NormalSt r2 H)
       | _ => idtac
     end;
     match goal with
@@ -138,7 +138,10 @@ Proof.
     end;
     constructor; intros;
     match goal with
-      | |- context [decProc ?p ?p0] => destruct (decProc p p0) as [ep|np]; simpl; try (rewrite ep in *);
+      | |- context [decProc ?p ?p0] =>
+          let ep := fresh in
+            let np := fresh in
+              destruct (decProc p p0) as [ep|np]; simpl; try (rewrite ep in *);
         intuition
       | _ => intuition
     end.
