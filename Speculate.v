@@ -124,7 +124,8 @@ Proof.
   Ltac comm IHSpec :=
     destruct IHSpec as [x [r1 r2]];
     match goal with
-      | p: Proc , stp: PerProcSpecState |- _ => let K := fresh in pose proof (r1 p) as K; unfold stp in *; rewrite K in *
+      | p: Proc , stp: PerProcSpecState |- _ =>
+          let K := fresh in pose proof (r1 p) as K; unfold stp in *; rewrite K in *
     end;
     match goal with
       | H: prog _ _ = Load _ |- _ => pose proof (NormalLd r2 H)
