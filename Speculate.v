@@ -5,11 +5,11 @@ Require Import List.
 Require Import Arith.
 
 Inductive Req :=
-| LdReq: nat -> Addr -> Req
+| LdReq: Tag -> Addr -> Req
 | StReq: Addr -> Data -> Req.
 
 Inductive Resp :=
-| LdResp: nat -> Data -> Resp.
+| LdResp: Tag -> Data -> Resp.
 
 Inductive Inst :=
 | Load: Addr -> Inst
@@ -28,7 +28,7 @@ Inductive SElem :=
 | Sst: Addr -> Data -> SElem
 | Sfl: Addr -> Data -> SElem.
 
-Definition SHist := list (nat * SElem).
+Definition SHist := list (Tag * SElem).
 
 Section GivenProg.
   Variable prog: Proc -> Hist -> Inst.
@@ -59,7 +59,7 @@ Section GivenProg.
   Record PerProcSpecState :=
     { hist': Hist;
       spec: SHist;
-      tag: nat;
+      tag: Tag;
       qs': list Req;
       rs': list Resp
     }.
@@ -70,7 +70,7 @@ Section GivenProg.
       | (m, x) :: xs => if eq_nat_dec m n then (m, op) :: xs else (m, x) :: updS xs n op
     end.
 
-  Fixpoint rmS A (s: list (nat * A)) n :=
+  Fixpoint rmS A (s: list (Tag * A)) n :=
     match s with
       | nil => nil
       | (m, x) :: xs => if eq_nat_dec m n then xs else (m, x) :: rmS xs n
