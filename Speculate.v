@@ -142,10 +142,9 @@ Proof.
       | |- context [decProc ?p ?p0] =>
           let ep := fresh in
             let np := fresh in
-              destruct (decProc p p0) as [ep|np]; simpl; try (rewrite ep in *);
-        intuition
-      | _ => intuition
-    end.
+              destruct (decProc p p0) as [ep|np]; simpl; try (rewrite ep in *)
+      | _ => idtac
+    end; intuition.
 
   induction H;
     (exists (fun p => Build_PerProcState nil nil nil); intuition; constructor) || comm IHSpec.
