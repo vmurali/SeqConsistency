@@ -122,90 +122,31 @@ Theorem specIsSc:
   forall st' m, Spec st' m -> exists st, (forall p, hist' (st' p) = hist (st p)) /\ Normal st m.
 Proof.
   intros.
-  induction H.
-  Ltac common x IHSpec := (try exists (fun p => Build_PerProcState nil nil nil); intuition; constructor)
-    || (
-    destruct IHSpec;
-    exists x;
-    constructor;
-    [ intros;
-      unfold mod;
-      match goal with
-        | _: _ |- context [decProc ?p ?p0] =>
-          destruct (decProc p p0) as [e | n]; simpl; intuition;
-          rewrite <- e in *;
-          match goal with
-            | H1: forall p: Proc, _ = _ |- _ => specialize (H1 p)
-          end;
-          intuition
-      end| 
-      intuition]).
 
-  common x IHSpec.
-  common x IHSpec.
-  common x IHSpec.
+  Ltac comm IHSpec :=
+    destruct IHSpec as [x [r1 r2]];
+    match goal with
+      | p: Proc , stp: PerProcSpecState |- _ => pose proof (r1 p) as K; unfold stp in *; rewrite K in *
+    end;
+    match goal with
+      | H: prog _ _ = Load _ |- _ => pose proof (NormalLd r2 H) as new
+      | H: prog _ _ = Store _ _ |- _ => pose proof (NormalSt r2 H) as new
+      | _ => idtac
+    end;
+    match goal with
+      | H: Normal ?x ?m, x: Proc -> PerProcState, H2: Normal ?y ?m |- _ =>
+          exists y; unfold mod in *
+      | _: Normal ?x ?m |- _ => exists x; unfold mod in *
+    end;
+    constructor; intros;
+    match goal with
+      | |- context [decProc ?p ?p0] => destruct (decProc p p0) as [ep|np]; simpl; try (rewrite ep in *);
+        intuition
+      | _ => intuition
+    end.
 
-  destruct IHSpec.
-  destruct H2.
-  pose proof (H2 p) as K.
-  unfold stp in H1.
-  rewrite K in H1.
-  pose proof (NormalLd H3 H1).
-  exists (mod x p
-              {|
-                hist := Ld a (m a) :: hist (x p);
-                qs := LdReq 0 a :: qs (x p);
-                rs := LdResp 0 (m a) :: rs (x p) |}).
-  constructor.
-  intros.
-  unfold mod.
-  destruct (decProc p p0); simpl; intuition.
-  unfold stp.
-  rewrite K.
-  reflexivity.
-  intuition.
-
-  destruct IHSpec.
-  destruct H3.
-  pose proof (H3 p) as K.
-  unfold stp in H2.
-  rewrite K in H2.
-  pose proof (NormalLd H4 H2).
-  exists (mod x p
-              {|
-                hist := Ld a (m a) :: hist (x p);
-                qs := LdReq 0 a :: qs (x p);
-                rs := LdResp 0 (m a) :: rs (x p) |}).
-  constructor.
-  intros.
-  unfold mod.
-  destruct (decProc p p0); simpl; intuition.
-  unfold stp.
-  rewrite K.
-  reflexivity.
-  intuition.
-
-  destruct IHSpec.
-  destruct H2.
-  pose proof (H2 p) as K.
-  unfold stp in H1.
-  rewrite K in H1.
-  pose proof (NormalSt H3 H1).
-  exists (mod x p
-              {|
-                hist := St a v :: hist (x p);
-                qs := StReq a v :: qs (x p);
-                rs := rs (x p) |}).
-  constructor.
-  intros.
-  unfold mod.
-  destruct (decProc p p0); simpl; intuition.
-  unfold stp.
-  rewrite K.
-  reflexivity.
-  intuition.
-
-  common x IHSpec.
+  induction H;
+    (exists (fun p => Build_PerProcState nil nil nil); intuition; constructor) || comm IHSpec.
 Qed.
 
 End GivenProg.
