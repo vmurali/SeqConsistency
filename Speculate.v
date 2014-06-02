@@ -146,8 +146,11 @@ Proof.
       | _ => idtac
     end; intuition.
 
-  induction H;
-    (exists (fun p => Build_PerProcState nil nil nil); intuition; constructor) || comm IHSpec.
+  match goal with
+    | H: Spec _ _ |- _ =>
+        induction H;
+        (exists (fun p => Build_PerProcState nil nil nil); intuition; constructor) || comm IHSpec
+  end.
 Qed.
 
 End GivenProg.
