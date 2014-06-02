@@ -66,13 +66,13 @@ Section GivenProg.
   Fixpoint updS A s n (op: A) :=
     match s with
       | nil => nil
-      | (m, x) :: xs => if eq_nat_dec m n then (m, op) :: xs else (m, x) :: updS xs n op
+      | (m, x) :: xs => if decTag m n then (m, op) :: xs else (m, x) :: updS xs n op
     end.
 
   Fixpoint rmS A (s: list (Tag * A)) n :=
     match s with
       | nil => nil
-      | (m, x) :: xs => if eq_nat_dec m n then xs else (m, x) :: rmS xs n
+      | (m, x) :: xs => if decTag m n then xs else (m, x) :: rmS xs n
     end.
 
   Fixpoint oldest A (s: list A) :=

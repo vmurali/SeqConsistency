@@ -1,5 +1,7 @@
 Set Implicit Arguments.
 
+Require Import Arith.
+
 Definition Time := nat.
 Definition Index := nat.
 
@@ -18,3 +20,4 @@ Axiom decProc: forall (p1 p2: Proc), {p1 = p2} + {p1 <> p2}.
 Parameter initData: Addr -> Data.
 
 Definition Tag := nat.
+Definition decTag := eq_nat_dec.
