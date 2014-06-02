@@ -2,7 +2,6 @@ Set Implicit Arguments.
 
 Require Import DataTypes.
 Require Import List.
-Require Import Arith.
 
 Inductive Req :=
 | LdReq: Tag -> Addr -> Req
