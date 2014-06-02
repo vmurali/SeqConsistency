@@ -3,7 +3,6 @@ Set Implicit Arguments.
 Require Import DataTypes.
 Require Import List.
 Require Import Arith.
-Require Import Tree.
 
 Inductive Req :=
 | LdReq: nat -> Addr -> Req
@@ -30,8 +29,6 @@ Inductive SElem :=
 | Sfl: Addr -> Data -> SElem.
 
 Definition SHist := list (nat * SElem).
-
-Axiom decProc: forall (p1 p2: Proc), {p1 = p2} + {p1 <> p2}.
 
 Section GivenProg.
   Variable prog: Proc -> Hist -> Inst.

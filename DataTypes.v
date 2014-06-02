@@ -5,7 +5,7 @@ Definition Index := nat.
 
 Parameter Addr: Set.
 Parameter zero: Addr.
-Axiom decAddr: forall a1 a2:Addr, {a1 = a2} + {a1 <> a2}.
+Axiom decAddr: forall (a1 a2:Addr), {a1 = a2} + {a1 <> a2}.
 
 Inductive Desc := Ld | St.
 
