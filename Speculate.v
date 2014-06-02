@@ -32,7 +32,6 @@ Definition SHist := list (Tag * SElem).
 
 Section GivenProg.
   Variable prog: Proc -> Hist -> Inst.
-  Variable m0: Mem.
 
   Definition mod A st p (new: A) p' :=
     if decProc p p' then new else st p'.
@@ -44,7 +43,7 @@ Section GivenProg.
     }.
              
   Inductive Normal: (Proc -> PerProcState) -> Mem -> Prop :=
-  | Init: Normal (fun p => Build_PerProcState nil nil nil) m0
+  | Init: Normal (fun p => Build_PerProcState nil nil nil) initData
   | NormalLd: forall st m p a,
                 let stp := st p in
                 Normal st m ->
@@ -84,7 +83,7 @@ Section GivenProg.
     end.
 
   Inductive Spec: (Proc -> PerProcSpecState) -> Mem -> Prop :=
-  | SpecInit: Spec (fun p => Build_PerProcSpecState nil nil 0 nil nil) m0
+  | SpecInit: Spec (fun p => Build_PerProcSpecState nil nil 0 nil nil) initData
   | SpecLdReq: forall st m p a,
                  let stp := st p in
                  Spec st m ->
