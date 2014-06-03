@@ -1,17 +1,16 @@
 Require Import DataTypes.
 
 Set Implicit Arguments.
+Record Req := { desc: Desc;
+                dataQ: Data
+              }.
+
+Record Resp := { procR: Proc;
+                 idx: Index;
+                 datum: Data
+               }.
 
 Section StoreAtomicity.
-  Record Req := { desc: Desc;
-                  dataQ: Data
-                }.
-
-  Record Resp := { procR: Proc;
-                   idx: Index;
-                   datum: Data
-                 }.
-
   Variable reqFn: Addr -> Proc -> Index -> Req.
 
   Variable respFn: Addr -> Time -> option Resp.

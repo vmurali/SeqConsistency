@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity Case NamedTrans Useful.
+Require Import DataTypes StoreAtomicity Case NamedTrans Useful AtomicRegIfc.
 
 Set Implicit Arguments.
 
@@ -7,30 +7,14 @@ Section ForAddr.
   Variable respFn: Addr -> Time -> option Resp.
   Variable a: Addr.
 
-  Record State := { mem: Data;
-                    next: Proc -> Index
-                  }.
-  
-  Inductive AtomicTrans s: State -> Set :=
-  | Req: forall c, AtomicTrans s (Build_State
-                                    (match desc (reqFn a c (next s c)) with
-                                       | Ld => mem s
-                                       | St => dataQ (reqFn a c (next s c))
-                                     end)
-                                    (fun t => match decProc t c with
-                                                | left _ => S (next s t)
-                                                | _ => next s t
-                                              end))
-  | Idle: AtomicTrans s s.
-  
   Variable sa: StoreAtomicity reqFn respFn a.
 
-  Definition AtomicList := TransList AtomicTrans (Build_State (initData a) (fun t => 0)).
+  Definition AtomicList := TransList (AtomicTrans reqFn a) (Build_State (initData a) (fun t => 0)).
 
   Definition getTransNext n s (al: AtomicList n s) :=
     match respFn a n with
-      | Some r => Build_NextTrans _ _ _ (Req s (procR r))
-      | None => Build_NextTrans _ _ _ (Idle s)
+      | Some r => Build_NextTrans _ _ _ (AReq reqFn a s (procR r))
+      | None => Build_NextTrans _ _ _ (Idle reqFn a s)
     end.
 
   Lemma nextLe t c: next (getTransSt getTransNext t) c <=
@@ -56,7 +40,7 @@ Section ForAddr.
   Qed.
 
   Lemma reqImpGt t: match getTrans getTransNext t with
-                      | Req c => S (next (getTransSt getTransNext t) c) =
+                      | AReq c => S (next (getTransSt getTransNext t) c) =
                                  next (getTransSt getTransNext (S t)) c /\
                                  forall c', c' <> c ->
                                             next (getTransSt getTransNext t ) c' =
@@ -82,7 +66,7 @@ Section ForAddr.
   Theorem uniqAtomLabels:
     forall t1 t2,
       match getTrans getTransNext t1, getTrans getTransNext t2 with
-        | Req c1, Req c2 =>
+        | AReq c1, AReq c2 =>
           c1 = c2 ->
           next (getTransSt getTransNext t1) c1 =
           next (getTransSt getTransNext t2) c2 ->
@@ -116,7 +100,7 @@ Section ForAddr.
 
   Theorem localAtomOrdering:
     forall t1 t2, match getTrans getTransNext t1, getTrans getTransNext t2 with
-                    | Req c1, Req c2 =>
+                    | AReq c1, AReq c2 =>
                       c1 = c2 ->
                       next (getTransSt getTransNext t1) c1 <
                       next (getTransSt getTransNext t2) c2 ->
@@ -146,7 +130,7 @@ Section ForAddr.
   Theorem allAtomPrev t c i:
     next (getTransSt getTransNext t) c > i ->
     exists t', t' < t /\ match getTrans getTransNext t' with
-                           | Req c' => c = c' /\
+                           | AReq c' => c = c' /\
                                        next (getTransSt getTransNext t') c' = i
                            | Idle => False
                          end.
@@ -195,7 +179,7 @@ Section ForAddr.
 
   Definition noCurrAtomStore t :=
     match getTrans getTransNext t with
-      | Req c' =>
+      | AReq c' =>
         let (descQ', dtQ') :=
             reqFn a c' (next (getTransSt getTransNext t) c') in
           descQ' = St -> False
@@ -213,7 +197,7 @@ Section ForAddr.
 
   Definition lastMatchAtomStore tm t :=
     match getTrans getTransNext tm with
-      | Req cm => matchAtomStore cm tm t /\
+      | AReq cm => matchAtomStore cm tm t /\
                   noAtomStore (S tm) t
       | _ => False
     end.
@@ -233,7 +217,7 @@ Section ForAddr.
     (exists tm,
        tm < t /\
        match getTrans getTransNext tm with
-         | Req cm => matchAtomStore cm tm (S t) /\
+         | AReq cm => matchAtomStore cm tm (S t) /\
                      noAtomStore (S tm) t
          | _ => False
        end) /\
@@ -317,7 +301,7 @@ Section ForAddr.
     destruct (trans (getTransNext (lTrans (getTransList getTransNext t))));
       simpl in *.
 
-    SCase "Req".
+    SCase "AReq".
     destruct (reqFn a c (next (lSt (getTransList getTransNext t)) c)); simpl.
     destruct desc.
 
@@ -347,7 +331,7 @@ Section ForAddr.
   Theorem storeAtomicityAtom:
     forall t,
       match getTrans getTransNext t with
-        | Req c =>
+        | AReq c =>
           let (descQ, dtQ) := reqFn a c (next (getTransSt getTransNext t) c) in
           match descQ with
             | Ld => latestAtomValue t
@@ -366,9 +350,9 @@ Section ForAddr.
     intuition.
   Qed.
 
-  Definition atomicResp s s' (t: AtomicTrans s s') :=
+  Definition atomicResp s s' (t: AtomicTrans reqFn a s s') :=
     match t with
-      | Req c => Some (Build_Resp c (next s c)
+      | AReq c => Some (Build_Resp c (next s c)
                                   match desc (reqFn a c (next s c)) with
                                     | Ld => mem s
                                     | St => initData zero
@@ -384,6 +368,26 @@ Section ForAddr.
       | None, Some _ => False
       | None, None => True
     end.
+
+  Theorem sameRespIsEq: forall r1 r2, sameResp r1 r2 <-> r1 = r2.
+  Proof.
+    intros r1 r2.
+    constructor; unfold sameResp.
+    intros.
+    repeat destructAll.
+    destruct H as [x [y z]].
+    rewrite x, y, z.
+    reflexivity.
+
+    intuition.
+    intuition.
+    intuition.
+    intuition.
+    rewrite H in *.
+    repeat destructAll.
+    intuition.
+    intuition.
+  Qed.
 
   Section PrevMatch.
     Variable t: nat.
@@ -683,11 +687,51 @@ Section ForAddr.
 
   Definition getAtomicResp n := atomicResp (getTrans getTransNext n).
 
-  Lemma respEq n: sameResp (respFn a n) (getAtomicResp n).
+  Lemma respEq' n: sameResp (respFn a n) (getAtomicResp n).
   Proof.
     apply (obeysP n).
   Qed.
 
-End ForAddr.
+  Lemma respEq n: respFn a n = getAtomicResp n.
+  Proof.
+    apply sameRespIsEq.
+    apply respEq'.
+  Qed.
 
-Print Assumptions respEq.
+  Fixpoint getResp n s (al: AtomicTransList reqFn a s) :=
+    match n with
+      | 0 => match al with
+               | Cons _ _ atss' als' => atomicResp atss'
+             end
+      | S m => match al with
+                 | Cons _ _ _ als' => getResp m als'
+               end
+    end.
+
+  CoFixpoint buildAl n: AtomicTransList reqFn a (lSt (getTransList getTransNext n))
+                                         := Cons (getTrans getTransNext n) (buildAl (S n)).
+
+  Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
+  Proof.
+    unfold getAtomicResp.
+    induction n.
+    simpl.
+    reflexivity.
+    intros.
+    simpl.
+    specialize (IHn (S m)).
+
+    assert (eq: n + S m = S (n + m)) by omega.
+    rewrite eq in *.
+    intuition.
+  Qed.
+
+  Lemma getRespEq n: getResp n (buildAl 0) = getAtomicResp n.
+  Proof.
+    pose proof (getRespEq' n 0) as sth.
+    assert (eq: n+0 = n) by omega.
+    rewrite eq in *.
+    intuition.
+  Qed.
+
+End ForAddr.
