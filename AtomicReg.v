@@ -683,7 +683,7 @@ Section ForAddr.
 
   Definition getAtomicResp n := atomicResp (getTrans getTransNext n).
 
-  Theorem respEq n: sameResp (respFn a n) (getAtomicResp n).
+  Lemma respEq n: sameResp (respFn a n) (getAtomicResp n).
   Proof.
     apply (obeysP n).
   Qed.
