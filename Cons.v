@@ -52,18 +52,6 @@ Section PerProc.
       forall s nextPc p2m m2p x w,
         Normal s nextPc p2m (m2p ++ (x :: nil)) w s nextPc p2m m2p w.
 
-  Section NormalList.
-    Variable s0: State.
-    Variable n0: Pc.
-    Inductive NormalList:
-      State -> Pc -> list Req -> list Resp -> bool -> Prop :=
-    | InitNormal: NormalList s0 n0 nil nil false
-    | CreateNormal: forall s nextPc p2m m2p w s' nextPc' p2m' m2p' w',
-                      Normal s nextPc p2m m2p w s' nextPc' p2m' m2p' w' ->
-                      NormalList s nextPc p2m m2p w ->
-                      NormalList s' nextPc' p2m' m2p' w'.
-  End NormalList.
-
   Variable Rob: Set.
 
   Definition CommitEntry := (Pc * Pc * Inst * option Data * DeltaState)%type.
@@ -165,14 +153,27 @@ Section PerProc.
           Spec s nextPc p2m m2p rob cs ppc s' nextPc' p2m' m2p' rob' cs' ppc' ->
           SpecList s nextPc p2m m2p rob cs ppc ->
           SpecList s' nextPc' p2m' m2p' rob' cs' ppc'.
-  End SpecList.
+
+    Inductive NormalList:
+      State -> Pc -> list Req -> list Resp -> bool -> Prop :=
+    | InitNormal: NormalList s0 n0 nil nil false
+    | CreateNormal: forall s nextPc p2m m2p w s' nextPc' p2m' m2p' w',
+                      Normal s nextPc p2m m2p w s' nextPc' p2m' m2p' w' ->
+                      NormalList s nextPc p2m m2p w ->
+                      NormalList s' nextPc' p2m' m2p' w'.
 
   Theorem specNormal:
-    forall s0 n0 ppc0 s nextPc p2m m2p rob cs ppc,
-      SpecList s0 n0 ppc0 s nextPc p2m m2p rob cs ppc ->
-      exists p2m' m2p' w,
-        NormalList s0 n0 s nextPc p2m' m2p' w.
+    forall s nextPc p2m m2p rob cs ppc,
+      SpecList s nextPc p2m m2p rob cs ppc ->
+      exists p2m' m2p',
+        NormalList s nextPc p2m' m2p' (match cs with
+                                         | Some _ => true
+                                         | None => false
+                                       end).
   Proof.
     admit.
   Qed.
+
+  End SpecList.
+
 End PerProc.
