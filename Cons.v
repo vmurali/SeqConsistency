@@ -146,8 +146,26 @@ Section PerProc.
     Variable n0: Pc.
     Variable ppc0: Ppc.
     Inductive SpecList:
-      State -> Pc -> list Req -> list Resp -> Rob -> option CommitState -> Ppc -> Prop :=
-    | InitSpec: SpecList s0 n0 nil nil empty None ppc0
+      State -> Pc -> list Req -> list Resp -> Rob -> option CommitState -> Ppc ->
+      (Addr -> Data) -> option Resp -> Prop :=
+    | InitSpec: SpecList s0 n0 nil nil empty None ppc0 initData None
+    | LdSpec: forall s nextPc p2m m2p rob cs ppc t a m,
+                Spec s nextPc (p2m ++ (LdReq t a :: nil)) m2p rob cs ppc
+                     s nextPc p2m m2p rob cs ppc ->
+                SpecList s nextPc (p2m ++ (LdReq t a :: nil)) m2p rob cs ppc m None ->
+                SpecList s nextPc p2m m2p rob cs ppc m (Some (LdResp t (m a)))
+    | LdCommitSpec: forall s nextPc p2m m2p rob cs ppc a m,
+                      Spec s nextPc (p2m ++ (LdCommitReq a :: nil)) m2p rob cs ppc
+                           s nextPc p2m m2p rob cs ppc ->
+                      SpecList s nextPc (p2m ++ (LdCommitReq a :: nil)) m2p rob cs ppc m None ->
+                      SpecList s nextPc p2m m2p rob cs ppc m (Some (LdCommitResp (m a))).
+    | LdSpec: forall s nextPc p2m m2p rob cs ppc t a m,
+                Spec s nextPc (p2m ++ (LdReq t a :: nil)) m2p rob cs ppc
+                     s nextPc p2m m2p rob cs ppc ->
+                SpecList s nextPc (p2m ++ (LdReq t a :: nil)) m2p rob cs ppc m None ->
+                SpecList s nextPc p2m m2p rob cs ppc m (Some (LdResp t (m a)))
+    | LdCommitSpec: 
+                          
     | CreateSpec:
         forall s nextPc p2m m2p rob cs ppc s' nextPc' p2m' m2p' rob' cs' ppc',
           Spec s nextPc p2m m2p rob cs ppc s' nextPc' p2m' m2p' rob' cs' ppc' ->
