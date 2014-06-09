@@ -7,13 +7,13 @@ Record Req := { desc: Desc;
               }.
 
 Record Resp := { addrR: Addr;
-                 procR: Cache;
+                 procR: Proc;
                  idx: Index;
                  datum: Data
                }.
 
 Section StoreAtomicity.
-  Variable reqFn: Addr -> Cache -> Index -> Req.
+  Variable reqFn: Addr -> Proc -> Index -> Req.
 
   Variable respFn: Time -> option Resp.
 
