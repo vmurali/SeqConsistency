@@ -1,5 +1,5 @@
 Require Import DataTypes StoreAtomicity.
-Require Import List Arith.
+Require Import List Arith JMeq.
 
 Set Implicit Arguments.
 
@@ -226,8 +226,8 @@ Section PerProc.
         SpecFinal state.
 
 
-  CoInductive Ls (A: Type) : Type :=
-  | Cons: forall x: A, Ls A -> Ls A.
+  CoInductive Stream (A: Type) : Type :=
+  | Cons: forall x: A, Stream A -> Stream A.
 
   CoFixpoint getRp sta (spf: SpecFinal sta) :=
     match spf with
@@ -241,6 +241,20 @@ Section PerProc.
         Cons None (getRp future)
     end.
 
+  Fixpoint respFn ls n :=
+    match n with
+      | 0 => match ls with
+               | Cons (Some (a, p, v)) rest =>
+                 Some (Build_Resp a p v)
+               | Cons None rest =>
+                 None
+             end
+      | S m => match ls with
+                 | Cons _ rest =>
+                   respFn rest m
+               end
+    end.
+
   CoFixpoint getRq sta (spf: SpecFinal sta) :=
     match spf with
       | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
@@ -248,19 +262,19 @@ Section PerProc.
           | LoadRq _ =>
             fun a' p' =>
               match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (Ld, None)) (getRq spf a' p')
+                | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
                 | _ , _ => Cons None (getRq spf a' p')
               end
           | LoadCommitRq =>
             fun a' p' =>
               match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (Ld, None)) (getRq spf a' p')
+                | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
                 | _ , _ => Cons None (getRq spf a' p')
               end
           | StoreRq v =>
             fun a' p' =>
               match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (St, Some v)) (getRq spf a' p')
+                | left _, left _ => Cons (Some (St, v)) (getRq spf a' p')
                 | _ , _ => Cons None (getRq spf a' p')
               end
         end
@@ -268,14 +282,39 @@ Section PerProc.
         fun a' p' => Cons None (getRq future a' p')
     end.
 
-(*
-  CoFixpoint getRpGood ls respFn t :=
-    match ls with
-      | Cons (Some (a, p, v)) rest =>
-        let f := (fun t' => if eq_nat_dec t t' then Some (Build_Resp a p v) else None) in
-        (f, getRpGood rest f (S t))
-      | Cons None rest =>
-        (respFn, getRpGood rest respFn (S t))
-    end.
-*)
+  Section Eventually.
+    Variable A: Type.
+    Variable P: A -> Prop.
+    Inductive Eventually: Stream A -> Type :=
+    | Event_e: forall x s, Eventually s -> Eventually (Cons x s)
+    | Event_n: forall x s, P x -> Eventually (Cons x s).
+
+    CoInductive AlwaysEventually: Stream A -> Type :=
+    | AE_n: forall x s, Eventually (Cons x s) -> AlwaysEventually s ->
+                        AlwaysEventually (Cons x s).
+
+    Program Fixpoint getFirst ls (als: AlwaysEventually ls) (es: Eventually ls) {struct es} :=
+      match ls as b return ls = b -> (A * AlwaysEventually b)  with
+        | Cons x s => fun heq => _
+      end (eq_refl ls).
+
+    Next Obligation.
+      destruct es.
+      destruct als.
+      
+      apply (x0, als).
+      assumption.
+
+    Program Fixpoint getN ls (als: AlwaysEventually ls) n :=
+      match als with
+        | AE_n _ _ es als' =>
+          match es with
+            | Event_e _ _ es' => fun y: (AE_n es' als') = als' => getN als' n
+            | Event_n x _ _ =>
+          end (eq_refl als')
+          match n with
+            | 0 => getFirst es
+            | S m => _
+          end
+      end.
 End PerProc.
