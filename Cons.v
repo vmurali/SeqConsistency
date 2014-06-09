@@ -250,23 +250,41 @@ Section PerProc.
       | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
         match x with
           | LoadRq _ =>
-            fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is p) with
+            getRq spf
+                  (fun a' c' =>
+                     match decAddr a a', decProc p c' with
+                       | left _, left _ => S (is a' c')
+                       | _, _ => is a' c'
+                     end)
+                  (fun a' c' i' =>
+              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
                 | left _, left _, left _ => Build_Req Ld (initData zero)
                 | _, _, _ => reqs a' c' i'
-              end
+              end)
           | LoadCommitRq =>
-            fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is p) with
+            getRq spf
+                  (fun a' c' =>
+                     match decAddr a a', decProc p c' with
+                       | left _, left _ => S (is a' c')
+                       | _, _ => is a' c'
+                     end)
+                  (fun a' c' i' =>
+              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
                 | left _, left _, left _ => Build_Req Ld (initData zero)
                 | _, _, _ => reqs a' c' i'
-              end
+              end)
           | StoreRq v =>
-            fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is p) with
+            getRq spf
+                  (fun a' c' =>
+                     match decAddr a a', decProc p c' with
+                       | left _, left _ => S (is a' c')
+                       | _, _ => is a' c'
+                     end)
+                  (fun a' c' i' =>
+              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
                 | left _, left _, left _ => Build_Req St v
                 | _, _, _ => reqs a' c' i'
-              end
+              end)
         end
       | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
         getRq future is reqs
