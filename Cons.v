@@ -25,11 +25,9 @@ Inductive HElem :=
 | Store: Addr -> Data -> HElem.
 
 Inductive HistElem :=
-| Nmh: DeltaState -> HistElem
-| Loadh: Addr -> Data -> DeltaState -> HistElem
-| Storeh: Addr -> Data -> HistElem.
-
-Definition Hist := list (Pc * HistElem).
+| Nmh: Pc -> DeltaState -> HistElem
+| Loadh: Pc -> Addr -> Data -> DeltaState -> HistElem
+| Storeh: Pc -> Addr -> Data -> HistElem.
 
 Inductive TransType := Internal | External.
 
@@ -45,7 +43,7 @@ Section PerProc.
   Variable issueLoad: Rob -> Tag -> Rob.
   Variable updLoad: Rob -> Tag -> Data -> Rob.
   Variable getComPc: Rob -> option Pc.
-  Variable commit: Rob -> option (Pc * Pc * HistElem).
+  Variable commit: Rob -> option (Pc * HistElem).
   Variable next: Ppc -> Ppc.
   Variable set: Ppc -> Pc -> Ppc.
   Variable get: Ppc -> Pc.
@@ -61,8 +59,8 @@ Section PerProc.
     else qs idx'.
 
   Inductive Spec:
-    Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
-    Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
+    HistElem -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
+    HistElem -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
     TransType -> Prop :=
   | SpecFetch:
       forall h st pc p2m m2p w rob ppc,
@@ -94,51 +92,51 @@ Section PerProc.
              Internal
   | SpecComNm:
       forall h st pc p2m m2p rob ppc nextPc delS,
-        commit rob = Some (pc, nextPc, Nmh delS) ->
+        commit rob = Some (pc, Nmh nextPc delS) ->
         getHElem pc st = (nextPc, Nm delS) ->
         Spec h st pc p2m m2p false rob ppc
-             ((pc, Nmh delS) :: h) (updSt st delS) nextPc p2m m2p false rob ppc
+             (Nmh pc delS) (updSt st delS) nextPc p2m m2p false rob ppc
              Internal
   | SpecComStRq:
       forall h st pc p2m m2p rob ppc nextPc a v,
-        commit rob = Some (pc, nextPc, Storeh a v) ->
+        commit rob = Some (pc, Storeh nextPc a v) ->
         getHElem pc st = (nextPc, Store a v) ->
         Spec h st pc p2m m2p false rob ppc
              h st pc (updQ p2m a (StoreRq v)) m2p true rob ppc
              Internal
   | SpecComStRp:
       forall h st pc p2m m2p rob ppc nextPc a v xs,
-        commit rob = Some (pc, nextPc, Storeh a v) ->
+        commit rob = Some (pc, Storeh nextPc a v) ->
         getHElem pc st = (nextPc, Store a v) ->
         m2p = StoreRp :: xs ->
         Spec h st pc p2m m2p false rob ppc
-             ((pc, Storeh a v) :: h) st nextPc p2m xs false rob ppc
+             (Storeh pc a v) st nextPc p2m xs false rob ppc
              Internal
   | SpecComLoadRq:
       forall h st pc p2m m2p rob ppc nextPc a v delS,
-        commit rob = Some (pc, nextPc, Loadh a v delS) ->
+        commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
         Spec h st pc p2m m2p false rob ppc
              h st pc (updQ p2m a LoadCommitRq) m2p true rob ppc
              Internal
   | SpecComLoadRpGood:
       forall h st pc p2m m2p rob ppc nextPc a v delS xs,
-        commit rob = Some (pc, nextPc, Loadh a v delS) ->
+        commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
         m2p = LoadCommitRp v :: xs ->
         getLoadDelta pc st v = delS ->
         Spec h st pc p2m m2p false rob ppc
-             ((pc, Loadh a v delS) :: h) (updSt st delS) nextPc p2m xs false rob ppc
+             (Loadh pc a v delS) (updSt st delS) nextPc p2m xs false rob ppc
              Internal
   | SpecComLoadRpBad:
       forall h st pc p2m m2p rob ppc nextPc a v delS xs v' delS',
-        commit rob = Some (pc, nextPc, Loadh a v delS) ->
+        commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
         m2p = LoadCommitRp v' :: xs ->
         v <> v' ->
         getLoadDelta pc st v' = delS' ->
         Spec h st pc p2m m2p false rob ppc
-             ((pc, Loadh a v' delS') :: h) (updSt st delS') nextPc p2m xs false
+             (Loadh pc a v' delS') (updSt st delS') nextPc p2m xs false
              (empty rob) (set ppc nextPc)
              Internal
   | SpecMemDeqs:
@@ -160,7 +158,7 @@ Section PerProc.
     else mem a'.
 
   Record ProcState :=
-    { hist: Hist;
+    { hist: HistElem;
       getPc: Pc;
       state: State
     }.
@@ -173,21 +171,21 @@ Section PerProc.
         getLoadDelta (getPc (st p)) (state (st p)) (m a) = delS ->
         CorrectSystem
           st m
-          (updP st p (Build_ProcState ((getPc (st p), Loadh a (m a) delS) :: hist (st p))
+          (updP st p (Build_ProcState (Loadh (getPc (st p)) a (m a) delS)
                                       nextPc (updSt (state (st p)) delS))) m
   | Str:
       forall p st m a nextPc v,
         getHElem (getPc (st p)) (state (st p)) = (nextPc, Store a v) ->
         CorrectSystem
           st m
-          (updP st p (Build_ProcState ((getPc (st p), Storeh a v) :: hist (st p))
+          (updP st p (Build_ProcState (Storeh (getPc (st p)) a v)
                                       nextPc (state (st p)))) (updM m a v)
   | NonMem:
       forall p st m nextPc delS,
         getHElem (getPc (st p)) (state (st p)) = (nextPc, Nm delS) ->
         CorrectSystem
           st m
-          (updP st p (Build_ProcState ((getPc (st p), Nmh delS) :: hist (st p))
+          (updP st p (Build_ProcState (Nmh (getPc (st p)) delS)
                                       nextPc (updSt (state (st p)) delS))) m.
 
   Variable initPc: Pc.
@@ -196,7 +194,7 @@ Section PerProc.
   Variable initPpc: Ppc.
 
   Record SpecState :=
-    { hist': Hist;
+    { hist': HistElem;
       st: State;
       pc: Pc;
       p2m: Addr -> list Rq;
@@ -231,62 +229,53 @@ Section PerProc.
   CoInductive Ls (A: Type) : Type :=
   | Cons: forall x: A, Ls A -> Ls A.
 
-  CoFixpoint getRp sta (spf: SpecFinal sta) is :=
+  CoFixpoint getRp sta (spf: SpecFinal sta) :=
     match spf with
       | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
         match y with
-          | LoadRp _ v => Cons (Some (Build_Resp a p (is p) v)) (getRp future (updP is p (S (is p))))
-          | LoadCommitRp v => Cons (Some (Build_Resp a p (is p) v)) (getRp future (updP is p (S (is p))))
-          | StRp => Cons (Some (Build_Resp a p (is p) (initData zero))) (getRp future (updP is p (S (is p))))
+          | LoadRp _ v => Cons (Some (a, p, v)) (getRp future)
+          | LoadCommitRp v => Cons (Some (a, p, v)) (getRp future)
+          | StRp => Cons (Some (a, p, initData zero)) (getRp future)
         end
       | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
-        Cons None (getRp future is)
+        Cons None (getRp future)
     end.
 
-  Definition respFn sta (spf: SpecFinal sta) := getRp spf (fun p => 0).
-
-  CoFixpoint getRq sta (spf: SpecFinal sta) is reqs :=
+  CoFixpoint getRq sta (spf: SpecFinal sta) :=
     match spf with
       | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
         match x with
           | LoadRq _ =>
-            getRq spf
-                  (fun a' c' =>
-                     match decAddr a a', decProc p c' with
-                       | left _, left _ => S (is a' c')
-                       | _, _ => is a' c'
-                     end)
-                  (fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
-                | left _, left _, left _ => Build_Req Ld (initData zero)
-                | _, _, _ => reqs a' c' i'
-              end)
+            fun a' p' =>
+              match decAddr a a', decProc p p' with
+                | left _, left _ => Cons (Some (Ld, None)) (getRq spf a' p')
+                | _ , _ => Cons None (getRq spf a' p')
+              end
           | LoadCommitRq =>
-            getRq spf
-                  (fun a' c' =>
-                     match decAddr a a', decProc p c' with
-                       | left _, left _ => S (is a' c')
-                       | _, _ => is a' c'
-                     end)
-                  (fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
-                | left _, left _, left _ => Build_Req Ld (initData zero)
-                | _, _, _ => reqs a' c' i'
-              end)
+            fun a' p' =>
+              match decAddr a a', decProc p p' with
+                | left _, left _ => Cons (Some (Ld, None)) (getRq spf a' p')
+                | _ , _ => Cons None (getRq spf a' p')
+              end
           | StoreRq v =>
-            getRq spf
-                  (fun a' c' =>
-                     match decAddr a a', decProc p c' with
-                       | left _, left _ => S (is a' c')
-                       | _, _ => is a' c'
-                     end)
-                  (fun a' c' i' =>
-              match decAddr a a', decProc p c', eq_nat_dec i' (is a p) with
-                | left _, left _, left _ => Build_Req St v
-                | _, _, _ => reqs a' c' i'
-              end)
+            fun a' p' =>
+              match decAddr a a', decProc p p' with
+                | left _, left _ => Cons (Some (St, Some v)) (getRq spf a' p')
+                | _ , _ => Cons None (getRq spf a' p')
+              end
         end
       | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
-        getRq future is reqs
+        fun a' p' => Cons None (getRq future a' p')
     end.
+
+(*
+  CoFixpoint getRpGood ls respFn t :=
+    match ls with
+      | Cons (Some (a, p, v)) rest =>
+        let f := (fun t' => if eq_nat_dec t t' then Some (Build_Resp a p v) else None) in
+        (f, getRpGood rest f (S t))
+      | Cons None rest =>
+        (respFn, getRpGood rest respFn (S t))
+    end.
+*)
 End PerProc.
