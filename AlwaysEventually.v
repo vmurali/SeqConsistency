@@ -6,6 +6,16 @@ Section AlwaysEventually.
   CoInductive Stream: Type :=
   | Cons: forall x: A, Stream -> Stream.
 
+  Definition hdStream s :=
+    match s with
+      | Cons x _ => x
+    end.
+
+  Definition tlStream s :=
+    match s with
+      | Cons _ xs => xs
+    end.
+
   Variable P: A -> Prop.
   Variable P_dec: forall x, {P x} + {~ P x}.
   Inductive Eventually: Stream -> Type :=
