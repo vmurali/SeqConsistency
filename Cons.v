@@ -5,11 +5,13 @@ Set Implicit Arguments.
 
 Definition Tag := nat.
 
+(* Request data type only for speculative processor *)
 Inductive Rq :=
 | LoadCommitRq: Rq
 | LoadRq: Tag -> Rq
 | StoreRq: Data -> Rq.
 
+(* Response data type only for speculative processor *)
 Inductive Rp :=
 | LoadCommitRp: Data -> Rp
 | LoadRp: Tag -> Data -> Rp
@@ -19,16 +21,26 @@ Variable Pc: Set.
 Variable State: Set.
 Variable DeltaState: Set.
 
+(* Result of decoding an instruction for both processors *)
 Inductive HElem :=
+  (* For non mem, simply get the delta state *)
 | Nm: DeltaState -> HElem
+  (* For load, simply get the address for loading *)
 | Load: Addr -> HElem
+  (* For store, simply get the address and value for loading *)
 | Store: Addr -> Data -> HElem.
 
+(* The history element to be logged for each instruction for both processors *)
 Inductive HistElem :=
+  (* For non mem, log delta state *)
 | Nmh: Pc -> DeltaState -> HistElem
+  (* For load, log addr, returned value, and delta state *)
 | Loadh: Pc -> Addr -> Data -> DeltaState -> HistElem
+  (* For store, log addr, sent value *)
 | Storeh: Pc -> Addr -> Data -> HistElem.
 
+(* Describes if transition is local to processor or memory initiated, for speculative
+ * processor*)
 Inductive TransType := Internal | External.
 
 Section PerProc.
@@ -60,6 +72,8 @@ Section PerProc.
 
   Definition Hist := list HistElem.
 
+  (* Transitions for a speculative processor. Only 3 of the last 6 matters, the
+   * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
     Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
     Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
@@ -159,12 +173,15 @@ Section PerProc.
     then v
     else mem a'.
 
+  (* State stored by an atomic processor, for each processor *)
   Record ProcState :=
     { hist: Hist;
       getPc: Pc;
       state: State
     }.
 
+  (* Transitions of an atomic processor with an atomic, monolithic memory. Load/store happens
+   * instantaneously. Note that the overall state is a (map for each processor) + memory *)
   Inductive CorrectSystem: (Proc -> ProcState) -> Mem ->
                              (Proc -> ProcState) -> Mem -> Set :=
   | Lod:
@@ -189,8 +206,11 @@ Section PerProc.
           st m
           (updP st p (Build_ProcState (Nmh (getPc (st p)) delS :: (hist (st p)))
                                       nextPc (updSt (state (st p)) delS))) m
+  (* This is to ensure that if the stupid speculating processor is doing stuff with ROB
+   * or some such useless work, I don't do any useful work here *)
   | Nothing: forall st m, CorrectSystem st m st m.
 
+  (* State stored by an speculative processor, for each processor *)
   Record SpecState :=
     { hist': Hist;
       st: State;
@@ -202,6 +222,9 @@ Section PerProc.
       ppc: Ppc
     }.
 
+  (* Transitions of a speculative processor, giving abstracting away the inner transitions
+   * and dealing with only abstract Internal and External transitions.
+   * Note that overall state is a mapping from each processor *)
   Inductive SpecFinal: (Proc -> SpecState) -> (Proc -> SpecState) -> Set :=
   | Int:
       forall state p h st pc p2m m2p wait rob ppc
@@ -223,9 +246,13 @@ Section PerProc.
         SpecFinal state
                   (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')).
 
+  (* A co-inductive instantiation of the above transitions to integrate with the previous
+   * cache work *)
   CoInductive SpecFinal': (Proc -> SpecState) -> Set :=
   | Build_SF: forall st1 st2, SpecFinal st1 st2 -> SpecFinal' st2 -> SpecFinal' st1.
 
+  (* This whole section contains mainly definitions to finally be able to use the 
+   * Store atomicity definition *)
   Section SpecFinal.
     Definition incIs is a p a' p' :=
       match decAddr a a', decProc p p' with
@@ -233,6 +260,7 @@ Section PerProc.
         | _, _ => is a' p'
       end.
 
+    (* Getting responses from the co-inductive transitions *)
     CoFixpoint getRp spa (spf': SpecFinal' spa) (is: Addr -> Proc -> Index) :=
       match spf' with
         | Build_SF _ _ spf future =>
@@ -250,6 +278,7 @@ Section PerProc.
           end
       end.
 
+    (* Getting requests in a bad format from the co-inductive transitions *)
     CoFixpoint getRq sta (spf': SpecFinal' sta) :=
       match spf' with
         | Build_SF _ _ spf future =>
@@ -280,6 +309,7 @@ Section PerProc.
           end
       end.
 
+    (* Getting n^th response from arbitrary co-inductive transitions *)
     Fixpoint respFn' ls n :=
       match n with
         | 0 => match ls with
@@ -304,8 +334,10 @@ Section PerProc.
     Definition spInit := Build_SpecState nil initState initPc (fun a => nil) nil false
                                          initRob initPpc.
 
+    (* These transitions are the golden transition which will obey StoreAtomicity *)
     Variable spf: SpecFinal' (fun p => spInit).
 
+    (* Getting n^th response from golden transition *)
     Definition respFn := respFn' (getRp spf (fun a p => 0)).
 
     Definition isSome A (x: option A) :=
@@ -319,28 +351,43 @@ Section PerProc.
       unfold isSome; destruct x; intuition.
     Qed.
 
+    Definition getSome A (x: option A) (pf: isSome x): A :=
+      match x as x0 return match x0 with
+                             | Some _ => True
+                             | None => False
+                           end -> A with
+        | Some a => fun _ => a
+        | None => fun pf0: False => match pf0 with end
+      end pf.
+
+    (* Asserting that the golden transition will always have memory requests *)
     Variable alSpf: forall a p, AlwaysEventually (@isSome _) (getRq spf a p).
 
-    Definition reqFn' a p := getN (@decOption _) (alSpf a p).
+    (* Getting the n^th request from the golden transition in bad format *)
+    Definition reqFn' a p := getN (@decOption _) (@getSome _) (alSpf a p).
 
+    (* Getting the n^th request from the golden transition in good format *)
     Definition reqFn a p n :=
       match reqFn' a p n with
-        | Some (x, y) => Build_Req x y
-        | None => Build_Req Ld (initData zero)
+        | (x, y) => Build_Req x y
       end.
 
+    (* Finally! Asserting that store atomicity holds *)
     Variable isStoreAtomic: StoreAtomicity reqFn respFn.
 
+    (* Defining a transition list for atomic processor atomic memory system *)
     Inductive CorrectSystemExec: (Proc -> ProcState) -> Mem -> Prop :=
     | CsExec: forall st1 st2 m1 m2, CorrectSystem st1 m1 st2 m2 -> CorrectSystemExec st1 m1 ->
                               CorrectSystemExec st2 m2
     | CsInit: CorrectSystemExec (fun p => normInit) initData.
 
+    (* Defining a transition list for speculative processor *)
     Inductive SpecSystemExec: (Proc -> SpecState) -> Prop :=
     | SpExec: forall st1 st2, SpecFinal st1 st2 -> SpecSystemExec st1 ->
                               SpecSystemExec st2
     | SpInit: SpecSystemExec (fun p => spInit).
 
+    (* Asserting that the histories match *)
     Theorem histMatch:
       forall ss, SpecSystemExec ss ->
                  exists ps m, CorrectSystemExec ps m /\

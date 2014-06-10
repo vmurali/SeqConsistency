@@ -1,7 +1,7 @@
 Set Implicit Arguments.
 
 Section AlwaysEventually.
-  Variable A: Type.
+  Variable A B: Type.
 
   CoInductive Stream: Type :=
   | Cons: forall x: A, Stream -> Stream.
@@ -28,6 +28,7 @@ Section AlwaysEventually.
 
   Record NextStream :=
     { ft: A;
+      sn: B;
       stm: Stream;
       pf: P ft;
       alsThing: AlwaysEventually stm
@@ -45,12 +46,12 @@ Section AlwaysEventually.
     injection eq; intros; assumption.
   Qed.
 
-  Fixpoint getFirst ls (es: Eventually ls) (als: AlwaysEventually ls) {struct es}: NextStream :=
+  Fixpoint getFirst f ls (es: Eventually ls) (als: AlwaysEventually ls) {struct es}: NextStream :=
     match ls as ls0 return ls0 = ls -> NextStream with
       | Cons x ls' =>
         fun heq: Cons x ls' = ls =>
           match P_dec x with
-            | left pp => Build_NextStream
+            | left pp => Build_NextStream (f x pp)
                            pp
                            (match als in AlwaysEventually ls0
                                   return
@@ -58,7 +59,7 @@ Section AlwaysEventually.
                               | AE_n x0 s' _ als' =>
                                 fun heq => eq_rect_r _ als' (injectionCons2 heq)
                             end heq)
-            | right pp => getFirst
+            | right pp => getFirst f
                             (match es in Eventually ls0
                                    return Cons x ls' = ls0 -> Eventually ls' with
                                | Event_e x0 s' es' =>
@@ -77,12 +78,12 @@ Section AlwaysEventually.
           end
     end eq_refl.
 
-  Fixpoint getN ls (als: AlwaysEventually ls) n :=
+  Fixpoint getN f ls (als: AlwaysEventually ls) n :=
     match als with
       | AE_n x s' es als' =>
         match n with
-          | 0 => ft (getFirst es (AE_n es als'))
-          | S m => getN (alsThing (getFirst es (AE_n es als'))) m
+          | 0 => sn (getFirst f es (AE_n es als'))
+          | S m => getN f (alsThing (getFirst f es (AE_n es als'))) m
         end
     end.
 End AlwaysEventually.
