@@ -18,13 +18,13 @@ Inductive Rp :=
 | StoreRp: Rp.
 
 Variable Pc: Set.
-Variable State: Set.
-Variable DeltaState: Set.
+Variable PState: Set.
+Variable DeltaPState: Set.
 
 (* Result of decoding an instruction for both processors *)
 Inductive HElem :=
   (* For non mem, simply get the delta state *)
-| Nm: DeltaState -> HElem
+| Nm: DeltaPState -> HElem
   (* For load, simply get the address for loading *)
 | Load: Addr -> HElem
   (* For store, simply get the address and value for loading *)
@@ -33,9 +33,9 @@ Inductive HElem :=
 (* The history element to be logged for each instruction for both processors *)
 Inductive HistElem :=
   (* For non mem, log delta state *)
-| Nmh: Pc -> DeltaState -> HistElem
+| Nmh: Pc -> DeltaPState -> HistElem
   (* For load, log addr, returned value, and delta state *)
-| Loadh: Pc -> Addr -> Data -> DeltaState -> HistElem
+| Loadh: Pc -> Addr -> Data -> DeltaPState -> HistElem
   (* For store, log addr, sent value *)
 | Storeh: Pc -> Addr -> Data -> HistElem.
 
@@ -46,9 +46,9 @@ Inductive TransType :=
 | External: Rp -> TransType.
 
 Section PerProc.
-  Variable updSt: State -> DeltaState -> State.
-  Variable getHElem: Pc -> State -> (Pc * HElem).
-  Variable getLoadDelta: Pc -> State -> Data -> DeltaState.
+  Variable updSt: PState -> DeltaPState -> PState.
+  Variable getHElem: Pc -> PState -> (Pc * HElem).
+  Variable getLoadDelta: Pc -> PState -> Data -> DeltaPState.
 
   Variable Rob Ppc: Set.
   Variable retire compute empty : Rob -> Rob.
@@ -77,8 +77,8 @@ Section PerProc.
   (* Transitions for a speculative processor. Only 5 of the last 7 matters, the
    * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
-    Hist -> State -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
-    Hist -> State -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
+    Hist -> PState -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
+    Hist -> PState -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
     TransType -> Prop :=
   | SpecFetch:
       forall h st pc p2m w rob ppc,
@@ -166,11 +166,11 @@ Section PerProc.
     then v
     else mem a'.
 
-  (* State stored by an atomic processor, for each processor *)
+  (* PState stored by an atomic processor, for each processor *)
   Record ProcState :=
     { hist: Hist;
       getPc: Pc;
-      state: State
+      state: PState
     }.
 
   (* Transitions of an atomic processor with an atomic, monolithic memory. Load/store happens
@@ -203,10 +203,10 @@ Section PerProc.
    * or some such useless work, I don't do any useful work here *)
   | Nothing: forall st m, CorrectSystem st m st m.
 
-  (* State stored by an speculative processor, for each processor *)
+  (* PState stored by an speculative processor, for each processor *)
   Record SpecState :=
     { hist': Hist;
-      st: State;
+      st: PState;
       pc: Pc;
       p2m: Addr -> list Rq;
       wait: bool;
@@ -239,8 +239,8 @@ Section PerProc.
 
   (* A co-inductive instantiation of the above transitions to integrate with the previous
    * cache work *)
-  CoInductive SpecFinal': (Proc -> SpecState) -> Set :=
-  | Build_SF: forall st1 st2, SpecFinal st1 st2 -> SpecFinal' st2 -> SpecFinal' st1.
+  CoInductive SpecFinalStream: (Proc -> SpecState) -> Set :=
+  | Build_SF: forall st1 st2, SpecFinal st1 st2 -> SpecFinalStream st2 -> SpecFinalStream st1.
 
   (* This whole section contains mainly definitions to finally be able to use the 
    * Store atomicity definition *)
@@ -252,7 +252,7 @@ Section PerProc.
       end.
 
     (* Getting responses from the co-inductive transitions *)
-    CoFixpoint getRp spa (spf': SpecFinal' spa) (is: Addr -> Proc -> Index) :=
+    CoFixpoint getRp spa (spf': SpecFinalStream spa) (is: Addr -> Proc -> Index) :=
       match spf' with
         | Build_SF _ _ spf future =>
           match spf with
@@ -270,7 +270,7 @@ Section PerProc.
       end.
 
     (* Getting requests in a bad format from the co-inductive transitions *)
-    CoFixpoint getRq sta (spf': SpecFinal' sta) :=
+    CoFixpoint getRq sta (spf': SpecFinalStream sta) :=
       match spf' with
         | Build_SF _ _ spf future =>
           match spf with
@@ -316,7 +316,7 @@ Section PerProc.
       end.
 
     Variable initPc: Pc.
-    Variable initState: State.
+    Variable initState: PState.
     Variable initRob: Rob.
     Variable initPpc: Ppc.
 
@@ -326,7 +326,7 @@ Section PerProc.
                                          initRob initPpc.
 
     (* These transitions are the golden transition which will obey StoreAtomicity *)
-    Variable spf: SpecFinal' (fun p => spInit).
+    Variable spf: SpecFinalStream (fun p => spInit).
 
     (* Getting n^th response from golden transition *)
     Definition respFn := respFn' (getRp spf (fun a p => 0)).
