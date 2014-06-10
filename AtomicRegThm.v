@@ -4,17 +4,17 @@ Require Import AtomicReg AtomicRegIfc StoreAtomicity DataTypes.
 
 Section ForAddr.
   Variable reqFn: Addr -> Proc -> Index -> Req.
-  Variable respFn: Addr -> Time -> option Resp.
-  Variable a: Addr.
+  Variable respFn: Time -> option Resp.
 
-  Variable sa: StoreAtomicity reqFn respFn a.
+  Variable sa: StoreAtomicity reqFn respFn.
 
   Theorem storeAtomicityImpAtomicRegBehavior n :
-    exists (al: AtomicTransList reqFn a (Build_State (initData a) (fun t => 0))),
-      respFn a n = getResp n al.
+    exists (al: AtomicTransList reqFn (Build_State (initData) (fun a t => 0))),
+      respFn n = getResp n al.
   Proof.
-    exists (buildAl reqFn respFn a 0).
-    pose proof (getRespEq reqFn respFn a n) as e1.
+    exists (buildAl reqFn respFn 0).
+    About getRespEq.
+    pose proof (getRespEq sa n) as e1.
     pose proof (respEq sa n) as e2.
     rewrite <- e1 in e2.
     assumption.
