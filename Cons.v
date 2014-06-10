@@ -41,7 +41,9 @@ Inductive HistElem :=
 
 (* Describes if transition is local to processor or memory initiated, for speculative
  * processor*)
-Inductive TransType := Internal | External.
+Inductive TransType :=
+| Internal: TransType
+| External: Rp -> TransType.
 
 Section PerProc.
   Variable updSt: State -> DeltaState -> State.
@@ -75,91 +77,82 @@ Section PerProc.
   (* Transitions for a speculative processor. Only 5 of the last 7 matters, the
    * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
-    Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
-    Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
+    Hist -> State -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
+    Hist -> State -> Pc -> (Addr -> list Rq) -> bool -> Rob -> Ppc ->
     TransType -> Prop :=
   | SpecFetch:
-      forall h st pc p2m m2p w rob ppc,
-        Spec h st pc p2m m2p w rob ppc
-             h st pc p2m m2p w (add rob (get ppc)) (next ppc)
+      forall h st pc p2m w rob ppc,
+        Spec h st pc p2m w rob ppc
+             h st pc p2m w (add rob (get ppc)) (next ppc)
              Internal
   | SpecExec:
-      forall h st pc p2m m2p w rob ppc,
-        Spec h st pc p2m m2p w rob ppc
-             h st pc p2m m2p w (compute rob) ppc
+      forall h st pc p2m w rob ppc,
+        Spec h st pc p2m w rob ppc
+             h st pc p2m w (compute rob) ppc
              Internal
   | SpecLoadRq:
-      forall h st pc p2m m2p w rob ppc tag a,
+      forall h st pc p2m w rob ppc tag a,
         getLoad rob = Some (tag, a) ->
-        Spec h st pc p2m m2p w rob ppc
-             h st pc (updQ p2m a (LoadRq tag)) m2p w (issueLoad rob tag) ppc
+        Spec h st pc p2m w rob ppc
+             h st pc (updQ p2m a (LoadRq tag)) w (issueLoad rob tag) ppc
              Internal
   | SpecLoadRp:
-      forall h st pc p2m m2p w rob ppc tag v xs,
-        m2p = LoadRp tag v :: xs ->
-        Spec h st pc p2m m2p w rob ppc
-             h st pc p2m xs w (updLoad rob tag v) ppc
-             Internal
+      forall h st pc p2m w rob ppc tag v p2m',
+        Spec h st pc p2m w rob ppc
+             h st pc p2m' w (updLoad rob tag v) ppc
+             (External (LoadRp tag v))
   | SpecAbort:
-      forall h st pc p2m m2p rob ppc pc',
+      forall h st pc p2m rob ppc pc',
         getComPc rob = Some pc' -> pc' <> pc ->
-        Spec h st pc p2m m2p false rob ppc
-             h st pc p2m m2p false (empty rob) (set ppc pc)
+        Spec h st pc p2m false rob ppc
+             h st pc p2m false (empty rob) (set ppc pc)
              Internal
   | SpecComNm:
-      forall h st pc p2m m2p rob ppc nextPc delS,
+      forall h st pc p2m rob ppc nextPc delS,
         commit rob = Some (pc, Nmh nextPc delS) ->
         getHElem pc st = (nextPc, Nm delS) ->
-        Spec h st pc p2m m2p false rob ppc
-             (Nmh pc delS :: h) (updSt st delS) nextPc p2m m2p false rob ppc
+        Spec h st pc p2m false rob ppc
+             (Nmh pc delS :: h) (updSt st delS) nextPc p2m false rob ppc
              Internal
   | SpecComStRq:
-      forall h st pc p2m m2p rob ppc nextPc a v,
+      forall h st pc p2m rob ppc nextPc a v,
         commit rob = Some (pc, Storeh nextPc a v) ->
         getHElem pc st = (nextPc, Store a v) ->
-        Spec h st pc p2m m2p false rob ppc
-             h st pc (updQ p2m a (StoreRq v)) m2p true rob ppc
+        Spec h st pc p2m false rob ppc
+             h st pc (updQ p2m a (StoreRq v)) true rob ppc
              Internal
   | SpecComStRp:
-      forall h st pc p2m m2p rob ppc nextPc a v xs,
+      forall h st pc p2m rob ppc nextPc a v p2m',
         commit rob = Some (pc, Storeh nextPc a v) ->
         getHElem pc st = (nextPc, Store a v) ->
-        m2p = StoreRp :: xs ->
-        Spec h st pc p2m m2p false rob ppc
-             (Storeh pc a v :: h) st nextPc p2m xs false rob ppc
-             Internal
+        Spec h st pc p2m false rob ppc
+             (Storeh pc a v :: h) st nextPc p2m' false rob ppc
+             (External StoreRp)
   | SpecComLoadRq:
-      forall h st pc p2m m2p rob ppc nextPc a v delS,
+      forall h st pc p2m rob ppc nextPc a v delS,
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
-        Spec h st pc p2m m2p false rob ppc
-             h st pc (updQ p2m a LoadCommitRq) m2p true rob ppc
+        Spec h st pc p2m false rob ppc
+             h st pc (updQ p2m a LoadCommitRq) true rob ppc
              Internal
   | SpecComLoadRpGood:
-      forall h st pc p2m m2p rob ppc nextPc a v delS xs,
+      forall h st pc p2m rob ppc nextPc a v delS p2m',
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
-        m2p = LoadCommitRp v :: xs ->
         getLoadDelta pc st v = delS ->
-        Spec h st pc p2m m2p false rob ppc
-             (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m xs false rob ppc
-             Internal
+        Spec h st pc p2m false rob ppc
+             (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m' false rob ppc
+             (External (LoadCommitRp v))
   | SpecComLoadRpBad:
-      forall h st pc p2m m2p rob ppc nextPc a v delS xs v' delS',
+      forall h st pc p2m rob ppc nextPc a v delS v' delS' p2m',
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
-        m2p = LoadCommitRp v' :: xs ->
         v <> v' ->
         getLoadDelta pc st v' = delS' ->
-        Spec h st pc p2m m2p false rob ppc
-             (Loadh pc a v' delS' :: h) (updSt st delS') nextPc p2m xs false
+        Spec h st pc p2m false rob ppc
+             (Loadh pc a v' delS' :: h) (updSt st delS') nextPc p2m' false
              (empty rob) (set ppc nextPc)
-             Internal
-  | SpecMemDeqs:
-      forall h st pc p2m m2p w rob ppc p2m' m2p',
-        Spec h st pc p2m m2p w rob ppc
-             h st pc p2m' m2p' w rob ppc
-             External.
+             (External (LoadCommitRp v')).
 
   Definition Mem := Addr -> Data.
 
@@ -216,7 +209,6 @@ Section PerProc.
       st: State;
       pc: Pc;
       p2m: Addr -> list Rq;
-      m2p: list Rp;
       wait: bool;
       rob: Rob;
       ppc: Ppc
@@ -227,24 +219,23 @@ Section PerProc.
    * Note that overall state is a mapping from each processor *)
   Inductive SpecFinal: (Proc -> SpecState) -> (Proc -> SpecState) -> Set :=
   | Int:
-      forall state p h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc',
-        state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
-        Spec h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' Internal ->
+      forall state p h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc',
+        state p = Build_SpecState h st pc p2m wait rob ppc ->
+        Spec h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc' Internal ->
         SpecFinal state
-                  (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc'))
+                  (updP state p (Build_SpecState h' st' pc' p2m' wait' rob' ppc'))
   | Ext:
-      forall state p h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' a x y,
-        state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
-        Spec h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' External ->
+      forall state p h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc' a x y,
+        state p = Build_SpecState h st pc p2m wait rob ppc ->
+        Spec h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc' (External y) ->
         p2m a = p2m' a ++ (x :: nil) ->
         (forall a', a' <> a -> p2m a = p2m' a) ->
-        m2p' = m2p ++ (y :: nil) ->
         SpecFinal state
-                  (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')).
+                  (updP state p (Build_SpecState h' st' pc' p2m' wait' rob' ppc')).
 
   (* A co-inductive instantiation of the above transitions to integrate with the previous
    * cache work *)
@@ -265,7 +256,7 @@ Section PerProc.
       match spf' with
         | Build_SF _ _ spf future =>
           match spf with
-            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel =>
+            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ _ _ =>
               match y with
                 | LoadRp _ v => Cons (Some (a, p, is a p, v)) (getRp future (incIs is a p))
                 | LoadCommitRp v => Cons (Some (a, p, is a p, v))
@@ -273,7 +264,7 @@ Section PerProc.
                 | StRp => Cons (Some (a, p, is a p, initData zero))
                                (getRp future (incIs is a p))
               end
-            | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+            | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
               Cons None (getRp future is)
           end
       end.
@@ -283,7 +274,7 @@ Section PerProc.
       match spf' with
         | Build_SF _ _ spf future =>
           match spf with
-            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel =>
+            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ _ _ =>
               match x with
                 | LoadRq _ =>
                   fun a' p' =>
@@ -304,7 +295,7 @@ Section PerProc.
                       | _ , _ => Cons None (getRq future a' p')
                     end
               end
-            | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+            | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
               fun a' p' => Cons None (getRq future a' p')
           end
       end.
@@ -331,7 +322,7 @@ Section PerProc.
 
     Definition normInit := Build_ProcState nil initPc initState.
 
-    Definition spInit := Build_SpecState nil initState initPc (fun a => nil) nil false
+    Definition spInit := Build_SpecState nil initState initPc (fun a => nil) false
                                          initRob initPpc.
 
     (* These transitions are the golden transition which will obey StoreAtomicity *)
