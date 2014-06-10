@@ -1,5 +1,5 @@
-Require Import DataTypes StoreAtomicity.
-Require Import List Arith JMeq.
+Require Import DataTypes StoreAtomicity AlwaysEventually.
+Require Import List Arith.
 
 Set Implicit Arguments.
 
@@ -204,117 +204,116 @@ Section PerProc.
       ppc: Ppc
     }.
 
-  CoInductive SpecFinal: (Proc -> SpecState) -> Set :=
-  | Int:
-      forall state p h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc',
-        state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
-        Spec h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' Internal ->
-        SpecFinal (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')) ->
-        SpecFinal state
-  | Ext:
-      forall state p h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' a x y,
-        state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
-        Spec h st pc p2m m2p wait rob ppc
-             h' st' pc' p2m' m2p' wait' rob' ppc' External ->
-        p2m a = p2m' a ++ (x :: nil) ->
-        (forall a', a' <> a -> p2m a = p2m' a) ->
-        m2p' = m2p ++ (y :: nil) ->
-        SpecFinal (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')) ->
-        SpecFinal state.
+  Section SpecFinal.
+    CoInductive SpecFinal: (Proc -> SpecState) -> Set :=
+    | Int:
+        forall state p h st pc p2m m2p wait rob ppc
+               h' st' pc' p2m' m2p' wait' rob' ppc',
+          state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
+          Spec h st pc p2m m2p wait rob ppc
+               h' st' pc' p2m' m2p' wait' rob' ppc' Internal ->
+          SpecFinal (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')) ->
+          SpecFinal state
+    | Ext:
+        forall state p h st pc p2m m2p wait rob ppc
+               h' st' pc' p2m' m2p' wait' rob' ppc' a x y,
+          state p = Build_SpecState h st pc p2m m2p wait rob ppc ->
+          Spec h st pc p2m m2p wait rob ppc
+               h' st' pc' p2m' m2p' wait' rob' ppc' External ->
+          p2m a = p2m' a ++ (x :: nil) ->
+          (forall a', a' <> a -> p2m a = p2m' a) ->
+          m2p' = m2p ++ (y :: nil) ->
+          SpecFinal (updP state p (Build_SpecState h' st' pc' p2m' m2p' wait' rob' ppc')) ->
+          SpecFinal state.
 
-
-  CoInductive Stream (A: Type) : Type :=
-  | Cons: forall x: A, Stream A -> Stream A.
-
-  CoFixpoint getRp sta (spf: SpecFinal sta) :=
-    match spf with
-      | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
-        match y with
-          | LoadRp _ v => Cons (Some (a, p, v)) (getRp future)
-          | LoadCommitRp v => Cons (Some (a, p, v)) (getRp future)
-          | StRp => Cons (Some (a, p, initData zero)) (getRp future)
-        end
-      | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
-        Cons None (getRp future)
-    end.
-
-  Fixpoint respFn ls n :=
-    match n with
-      | 0 => match ls with
-               | Cons (Some (a, p, v)) rest =>
-                 Some (Build_Resp a p v)
-               | Cons None rest =>
-                 None
-             end
-      | S m => match ls with
-                 | Cons _ rest =>
-                   respFn rest m
-               end
-    end.
-
-  CoFixpoint getRq sta (spf: SpecFinal sta) :=
-    match spf with
-      | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
-        match x with
-          | LoadRq _ =>
-            fun a' p' =>
-              match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
-                | _ , _ => Cons None (getRq spf a' p')
-              end
-          | LoadCommitRq =>
-            fun a' p' =>
-              match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
-                | _ , _ => Cons None (getRq spf a' p')
-              end
-          | StoreRq v =>
-            fun a' p' =>
-              match decAddr a a', decProc p p' with
-                | left _, left _ => Cons (Some (St, v)) (getRq spf a' p')
-                | _ , _ => Cons None (getRq spf a' p')
-              end
-        end
-      | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
-        fun a' p' => Cons None (getRq future a' p')
-    end.
-
-  Section Eventually.
-    Variable A: Type.
-    Variable P: A -> Prop.
-    Inductive Eventually: Stream A -> Type :=
-    | Event_e: forall x s, Eventually s -> Eventually (Cons x s)
-    | Event_n: forall x s, P x -> Eventually (Cons x s).
-
-    CoInductive AlwaysEventually: Stream A -> Type :=
-    | AE_n: forall x s, Eventually (Cons x s) -> AlwaysEventually s ->
-                        AlwaysEventually (Cons x s).
-
-    Program Fixpoint getFirst ls (als: AlwaysEventually ls) (es: Eventually ls) {struct es} :=
-      match ls as b return ls = b -> (A * AlwaysEventually b)  with
-        | Cons x s => fun heq => _
-      end (eq_refl ls).
-
-    Next Obligation.
-      destruct es.
-      destruct als.
-      
-      apply (x0, als).
-      assumption.
-
-    Program Fixpoint getN ls (als: AlwaysEventually ls) n :=
-      match als with
-        | AE_n _ _ es als' =>
-          match es with
-            | Event_e _ _ es' => fun y: (AE_n es' als') = als' => getN als' n
-            | Event_n x _ _ =>
-          end (eq_refl als')
-          match n with
-            | 0 => getFirst es
-            | S m => _
-          end
+    Definition incIs is a p a' p' :=
+      match decAddr a a', decProc p p' with
+        | left _, left _ => S (is a' p')
+        | _, _ => is a' p'
       end.
+
+    CoFixpoint getRp spa (spf: SpecFinal spa) (is: Addr -> Proc -> Index) :=
+      match spf with
+        | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
+          match y with
+            | LoadRp _ v => Cons (Some (a, p, is a p, v)) (getRp future (incIs is a p))
+            | LoadCommitRp v => Cons (Some (a, p, is a p, v)) (getRp future (incIs is a p))
+            | StRp => Cons (Some (a, p, is a p, initData zero)) (getRp future (incIs is a p))
+          end
+        | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
+          Cons None (getRp future is)
+      end.
+
+    CoFixpoint getRq sta (spf: SpecFinal sta) :=
+      match spf with
+        | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ p2m1 _ m2prel future =>
+          match x with
+            | LoadRq _ =>
+              fun a' p' =>
+                match decAddr a a', decProc p p' with
+                  | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
+                  | _ , _ => Cons None (getRq spf a' p')
+                end
+            | LoadCommitRq =>
+              fun a' p' =>
+                match decAddr a a', decProc p p' with
+                  | left _, left _ => Cons (Some (Ld, initData zero)) (getRq spf a' p')
+                  | _ , _ => Cons None (getRq spf a' p')
+                end
+            | StoreRq v =>
+              fun a' p' =>
+                match decAddr a a', decProc p p' with
+                  | left _, left _ => Cons (Some (St, v)) (getRq spf a' p')
+                  | _ , _ => Cons None (getRq spf a' p')
+                end
+          end
+        | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ future =>
+          fun a' p' => Cons None (getRq future a' p')
+      end.
+
+    Fixpoint respFn' ls n :=
+      match n with
+        | 0 => match ls with
+                 | Cons (Some (a, p, i, v)) rest =>
+                   Some (Build_Resp a p i v)
+                 | Cons None rest =>
+                   None
+               end
+        | S m => match ls with
+                   | Cons _ rest =>
+                     respFn' rest m
+                 end
+      end.
+
+    Variable spInit: Proc -> SpecState.
+    Variable spf: SpecFinal spInit.
+
+    Definition respFn := respFn' (getRp spf (fun a p => 0)).
+
+    Definition isSome A (x: option A) :=
+      match x with
+        | Some y => True
+        | _ => False
+      end.
+
+    Theorem decOption A (x: option A): {isSome x} + {~ isSome x}.
+    Proof.
+      unfold isSome; destruct x; intuition.
+    Qed.
+
+    Variable alSpf: forall a p, AlwaysEventually (@isSome _) (getRq spf a p).
+
+    Definition reqFn' a p := getN (@decOption _) (alSpf a p).
+
+    Definition reqFn a p n :=
+      match reqFn' a p n with
+        | Some (x, y) => Build_Req x y
+        | None => Build_Req Ld (initData zero)
+      end.
+
+    Variable isStoreAtomic: StoreAtomicity reqFn respFn.
+
+    Theorem histMatch:
+      
+  End SpecFinal.
 End PerProc.
