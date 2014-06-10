@@ -72,7 +72,7 @@ Section PerProc.
 
   Definition Hist := list HistElem.
 
-  (* Transitions for a speculative processor. Only 3 of the last 6 matters, the
+  (* Transitions for a speculative processor. Only 5 of the last 7 matters, the
    * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
     Hist -> State -> Pc -> (Addr -> list Rq) -> list Rp -> bool -> Rob -> Ppc ->
