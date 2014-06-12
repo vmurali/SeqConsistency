@@ -103,6 +103,9 @@ Section PerProc.
              Internal
   | SpecLoadRp:
       forall h st pc p2m w rob ppc tag v p2m',
+        forall a x,
+          p2m a = p2m' a ++ x::nil ->
+          (forall a', a' <> a -> p2m a' = p2m' a') ->
         Spec h st pc p2m w rob ppc
              h st pc p2m' w (updLoad rob tag v) ppc
              (External (LoadRp tag v))
@@ -128,6 +131,9 @@ Section PerProc.
              Internal
   | SpecComStRp:
       forall h st pc p2m rob ppc nextPc a v p2m',
+        forall x,
+          p2m a = p2m' a ++ x::nil ->
+          (forall a', a' <> a -> p2m a' = p2m' a') ->
         commit rob = Some (pc, Storeh nextPc a v) ->
         getDecodeElem pc st = (nextPc, Store a v) ->
         Spec h st pc p2m true rob ppc
@@ -142,6 +148,9 @@ Section PerProc.
              Internal
   | SpecComLoadRpGood:
       forall h st pc p2m rob ppc nextPc a v delS p2m',
+        forall x,
+          p2m a = p2m' a ++ x::nil ->
+          (forall a', a' <> a -> p2m a' = p2m' a') ->
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getDecodeElem pc st = (nextPc, Load a) ->
         getLoadDelta pc st v = delS ->
@@ -150,6 +159,9 @@ Section PerProc.
              (External (LoadCommitRp v))
   | SpecComLoadRpBad:
       forall h st pc p2m rob ppc nextPc a v delS v' delS' p2m',
+        forall x,
+          p2m a = p2m' a ++ x::nil ->
+          (forall a', a' <> a -> p2m a' = p2m' a') ->
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getDecodeElem pc st = (nextPc, Load a) ->
         v <> v' ->
