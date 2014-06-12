@@ -30,6 +30,6 @@ Section ForAddr.
   | Idle: AtomicTrans s s.
   
   CoInductive AtomicTransList: State -> Set :=
-    | Cons: forall s s', AtomicTrans s s' -> AtomicTransList s' -> AtomicTransList s.
+    | TCons: forall s s', AtomicTrans s s' -> AtomicTransList s' -> AtomicTransList s.
 
 End ForAddr.

@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity AlwaysEventually.
+Require Import DataTypes StoreAtomicity AlwaysEventually AtomicRegIfc AtomicRegThm AtomicReg.
 Require Import List Arith.
 
 Set Implicit Arguments.
@@ -56,11 +56,16 @@ Section PerProc.
   Variable getLoad: Rob -> option (Tag * Addr).
   Variable issueLoad: Rob -> Tag -> Rob.
   Variable updLoad: Rob -> Tag -> Data -> Rob.
-  Variable getComPc: Rob -> option Pc.
   Variable commit: Rob -> option (Pc * HistElem).
-  Variable next: Ppc -> Ppc.
+  Variable nextPpc: Ppc -> Ppc.
   Variable set: Ppc -> Pc -> Ppc.
   Variable get: Ppc -> Pc.
+
+  Definition getComPc rob :=
+    match commit rob with
+      | Some (pc, _) => Some pc
+      | None => None
+    end.
 
   Definition updQ A qs idx (v: A) idx' :=
     if decAddr idx idx'
@@ -83,7 +88,7 @@ Section PerProc.
   | SpecFetch:
       forall h st pc p2m w rob ppc,
         Spec h st pc p2m w rob ppc
-             h st pc p2m w (add rob (get ppc)) (next ppc)
+             h st pc p2m w (add rob (get ppc)) (nextPpc ppc)
              Internal
   | SpecExec:
       forall h st pc p2m w rob ppc,
@@ -97,9 +102,9 @@ Section PerProc.
              h st pc (updQ p2m a (LoadRq tag)) w (issueLoad rob tag) ppc
              Internal
   | SpecLoadRp:
-      forall h st pc p2m w rob ppc tag v p2m',
+      forall h st pc p2m w rob ppc tag v,
         Spec h st pc p2m w rob ppc
-             h st pc p2m' w (updLoad rob tag v) ppc
+             h st pc p2m w (updLoad rob tag v) ppc
              (External (LoadRp tag v))
   | SpecAbort:
       forall h st pc p2m rob ppc pc',
@@ -125,7 +130,7 @@ Section PerProc.
       forall h st pc p2m rob ppc nextPc a v p2m',
         commit rob = Some (pc, Storeh nextPc a v) ->
         getHElem pc st = (nextPc, Store a v) ->
-        Spec h st pc p2m false rob ppc
+        Spec h st pc p2m true rob ppc
              (Storeh pc a v :: h) st nextPc p2m' false rob ppc
              (External StoreRp)
   | SpecComLoadRq:
@@ -140,7 +145,7 @@ Section PerProc.
         commit rob = Some (pc, Loadh nextPc a v delS) ->
         getHElem pc st = (nextPc, Load a) ->
         getLoadDelta pc st v = delS ->
-        Spec h st pc p2m false rob ppc
+        Spec h st pc p2m true rob ppc
              (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m' false rob ppc
              (External (LoadCommitRp v))
   | SpecComLoadRpBad:
@@ -149,7 +154,7 @@ Section PerProc.
         getHElem pc st = (nextPc, Load a) ->
         v <> v' ->
         getLoadDelta pc st v' = delS' ->
-        Spec h st pc p2m false rob ppc
+        Spec h st pc p2m true rob ppc
              (Loadh pc a v' delS' :: h) (updSt st delS') nextPc p2m' false
              (empty rob) (set ppc nextPc)
              (External (LoadCommitRp v')).
@@ -228,10 +233,14 @@ Section PerProc.
                   (updP state p (Build_SpecState h' st' pc' p2m' wait' rob' ppc'))
   | Ext:
       forall state p h st pc p2m wait rob ppc
-             h' st' pc' p2m' wait' rob' ppc' a x y,
+             h' st' pc' p2m' wait' rob' ppc' a x v,
         state p = Build_SpecState h st pc p2m wait rob ppc ->
         Spec h st pc p2m wait rob ppc
-             h' st' pc' p2m' wait' rob' ppc' (External y) ->
+             h' st' pc' p2m' wait' rob' ppc' (External match x with
+                                                         | LoadRq t => LoadRp t v
+                                                         | LoadCommitRq => LoadCommitRp v
+                                                         | StoreRq _ => StoreRp
+                                                       end ) ->
         p2m a = p2m' a ++ (x :: nil) ->
         (forall a', a' <> a -> p2m a = p2m' a) ->
         SpecFinal state
@@ -256,16 +265,16 @@ Section PerProc.
       match spf' with
         | Build_SF _ _ spf future =>
           match spf with
-            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x y _ _ _ _ =>
-              match y with
-                | LoadRp _ v => Cons (Some (a, p, is a p, v)) (getRp future (incIs is a p))
-                | LoadCommitRp v => Cons (Some (a, p, is a p, v))
+            | Ext _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x v _ _ _ _ =>
+              match x with
+                | LoadRq t => Cons (Some (a, p, is a p, v)) (getRp future (incIs is a p))
+                | LoadCommitRq => Cons (Some (a, p, is a p, v))
                                          (getRp future (incIs is a p))
-                | StRp => Cons (Some (a, p, is a p, initData zero))
-                               (getRp future (incIs is a p))
+                | StoreRq _ => Cons (Some (a, p, is a p, initData zero))
+                                    (getRp future (incIs is a p))
               end
             | Int _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
-              Cons None (getRp future is)
+                Cons None (getRp future is)
           end
       end.
 
@@ -365,6 +374,184 @@ Section PerProc.
 
     (* Finally! Asserting that store atomicity holds *)
     Variable isStoreAtomic: StoreAtomicity reqFn respFn.
+
+    Definition atBeh := atomicBeh (saBehAtomicReg isStoreAtomic).
+    Definition atMatch := respMatch (saBehAtomicReg isStoreAtomic).
+
+    (* Speculative system with atomic register *)
+    Inductive SpecFinal': (Proc -> SpecState) -> State -> (Proc -> SpecState) -> State -> Set :=
+    | Int':
+      forall state astate p h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc',
+        state p = Build_SpecState h st pc p2m wait rob ppc ->
+        Spec h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc' Internal ->
+        SpecFinal' state astate
+                   (updP state p (Build_SpecState h' st' pc' p2m' wait' rob' ppc')) astate
+    | Ext':
+      forall state astate p h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc' a x,
+        state p = Build_SpecState h st pc p2m wait rob ppc ->
+        Spec h st pc p2m wait rob ppc
+             h' st' pc' p2m' wait' rob' ppc'
+             (External
+                match x with
+                  | LoadRq t => LoadRp t (mem astate a)
+                  | LoadCommitRq => LoadCommitRp (mem astate a)
+                  | StoreRq _ => StoreRp
+                end) ->
+        p2m a = p2m' a ++ (x :: nil) ->
+        (forall a', a' <> a -> p2m a = p2m' a) ->
+        SpecFinal' state astate
+                   (updP state p (Build_SpecState h' st' pc' p2m' wait' rob' ppc'))
+                   (Build_State
+                      (match x with
+                         | StoreRq v => fun a' =>
+                                          if decAddr a a'
+                                          then v
+                                          else mem astate a'
+                         | _ => mem astate
+                       end)
+                      (fun a' t => 
+                         if decAddr a a'
+                         then
+                           match decProc t p with
+                             | left _ => S (next astate a' t)
+                             | _ => next astate a' t
+                           end
+                         else next astate a' t
+                   )).
+
+    (* A co-inductive instantiation of the above transitions *)
+    CoInductive SpecFinalStream': (Proc -> SpecState) -> State -> Set :=
+              | Build_SF':
+                forall st1 st2 m1 m2,
+                  SpecFinal' st1 m1 st2 m2 ->
+                  SpecFinalStream' st2 m2 -> SpecFinalStream' st1 m1.
+
+    Definition specFinal'Resp st1 m1 st2 m2 (t: SpecFinal' st1 m1 st2 m2) :=
+      match t with
+        | Ext' _ _ p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x _ _ _ _ => Some
+            match x with
+              | StoreRq v => Build_Resp a p (next m1 a p) (initData zero)
+              | _ => Build_Resp a p (next m1 a p) (mem m1 a)
+            end
+        | _ => None
+      end.
+
+    Fixpoint getResp n s m (al: SpecFinalStream' s m) :=
+      match n with
+      | 0 => match al with
+               | Build_SF' _ _ _ _ f _ => specFinal'Resp f
+             end
+      | S m => match al with
+                 | Build_SF' _ _ _ _ _ al' => getResp m al'
+               end
+    end.
+
+(*
+
+Some junk. Do not read.
+
+    Require Import JMeq.
+
+    Program CoFixpoint spf' n m s (ss: SpecFinalStream s) :=
+    match ss with
+      | Build_SF _ _ t ss1 =>
+          match t with
+            | Int s p _ _ _ _ _ _ _ _ _ _ _ _ _ _ pSt t =>
+                Build_SF' (Int' s m p pSt t) (spf' (S n) m ss1)
+            | Ext s p _ _ _ _ _ _ _ _ _ _ _ _ _ _ a x v pSt t p2m1 p2m2 =>
+                Build_SF' (Ext' s m p x pSt t p2m1 p2m2) (spf' (S n)
+                                                               (Build_State
+                                                                  (match x with
+                                                                     | StoreRq v => fun a' =>
+                                                                                      if decAddr a a'
+                                                                                      then v
+                                                                                      else mem m a'
+                                                                     | _ => mem m
+                                                                   end)
+                                                                  (fun a' t => 
+                                                                     if decAddr a a'
+                                                                     then
+                                                                       match decProc t p with
+                                                                         | left _ => S (next m a' t)
+                                                                         | _ => next m a' t
+                                                                       end
+                                                                     else next m a' t
+                                                               )) ss1)
+
+          end
+    end.
+
+    Next Obligation.
+      pose atBeh as abeh.
+      unfold atBeh in *.
+      pose proof (atMatch n) as atMatch.
+      unfold saBehAtomicReg in abeh; simpl in *.
+      unfold buildAl in abeh.
+      induction n.
+      simpl in *.
+      unfold atomicResp in *.
+      unfold NamedTrans.getTrans in *.
+      unfold getTransNext in *.
+      simpl in *.
+      destruct (respFn 0).
+      simpl in *.
+      unfold saBehAtomic
+      unfold atomicResp in *.
+      unfold atomicBeh in H.
+      unfold AtomicReg.getResp in H.
+      simpl in H.
+      
+      unfold AtomicReg.atomicResp in *.
+      unfold saBehAtomic
+      unfold AtomicReg.getResp in *.
+      induction 
+      
+      Proof.
+      pose 
+      apply (Ext').
+
+    CoFixpoint buildAl n: SpecFinalStream' (lSt (getTransList getTransNext n))
+    := TCons (getTrans getTransNext n) (buildAl (S n)).
+
+  Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
+  Proof.
+    unfold getAtomicResp.
+    induction n.
+    simpl.
+    reflexivity.
+    intros.
+    simpl.
+    specialize (IHn (S m)).
+
+    assert (eq: n + S m = S (n + m)) by omega.
+    rewrite eq in *.
+    intuition.
+  Qed.
+
+  Lemma getRespEq n: getResp n (buildAl 0) = getAtomicResp n.
+  Proof.
+    pose proof (getRespEq' n 0) as sth.
+    assert (eq: n+0 = n) by omega.
+    rewrite eq in *.
+    intuition.
+  Qed.
+
+  Theorem storeAtomicityImpAtomicRegBehavior n :
+    exists (al: AtomicTransList reqFn (Build_State (initData) (fun a t => 0))),
+      respFn n = getResp n al.
+  Proof.
+    exists (buildAl reqFn respFn 0).
+    About getRespEq.
+    pose proof (getRespEq sa n) as e1.
+    pose proof (respEq sa n) as e2.
+    rewrite <- e1 in e2.
+    assumption.
+  Qed.
+*)
+
 
     (* Defining a transition list for atomic processor atomic memory system *)
     Inductive CorrectSystemExec: (Proc -> ProcState) -> Mem -> Prop :=

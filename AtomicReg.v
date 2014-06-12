@@ -787,15 +787,15 @@ Section ForAddr.
   Fixpoint getResp n s (al: AtomicTransList reqFn s) :=
     match n with
       | 0 => match al with
-               | Cons _ _ atss' als' => atomicResp atss'
+               | TCons _ _ atss' als' => atomicResp atss'
              end
       | S m => match al with
-                 | Cons _ _ _ als' => getResp m als'
+                 | TCons _ _ _ als' => getResp m als'
                end
     end.
 
   CoFixpoint buildAl n: AtomicTransList reqFn (lSt (getTransList getTransNext n))
-                                         := Cons (getTrans getTransNext n) (buildAl (S n)).
+                                         := TCons (getTrans getTransNext n) (buildAl (S n)).
 
   Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
   Proof.
