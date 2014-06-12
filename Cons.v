@@ -22,13 +22,13 @@ Variable PState: Set.
 Variable DeltaPState: Set.
 
 (* Result of decoding an instruction for both processors *)
-Inductive HElem :=
+Inductive DecodeElem :=
   (* For non mem, simply get the delta state *)
-| Nm: DeltaPState -> HElem
+| Nm: DeltaPState -> DecodeElem
   (* For load, simply get the address for loading *)
-| Load: Addr -> HElem
+| Load: Addr -> DecodeElem
   (* For store, simply get the address and value for loading *)
-| Store: Addr -> Data -> HElem.
+| Store: Addr -> Data -> DecodeElem.
 
 (* The history element to be logged for each instruction for both processors *)
 Inductive HistElem :=
@@ -47,7 +47,7 @@ Inductive TransType :=
 
 Section PerProc.
   Variable updSt: PState -> DeltaPState -> PState.
-  Variable getHElem: Pc -> PState -> (Pc * HElem).
+  Variable getDecodeElem: Pc -> PState -> (Pc * DecodeElem).
   Variable getLoadDelta: Pc -> PState -> Data -> DeltaPState.
 
   Variable Rob Ppc: Set.
@@ -115,35 +115,35 @@ Section PerProc.
   | SpecComNm:
       forall h st pc p2m rob ppc nextPc delS,
         commit rob = Some (pc, Nmh nextPc delS) ->
-        getHElem pc st = (nextPc, Nm delS) ->
+        getDecodeElem pc st = (nextPc, Nm delS) ->
         Spec h st pc p2m false rob ppc
              (Nmh pc delS :: h) (updSt st delS) nextPc p2m false rob ppc
              Internal
   | SpecComStRq:
       forall h st pc p2m rob ppc nextPc a v,
         commit rob = Some (pc, Storeh nextPc a v) ->
-        getHElem pc st = (nextPc, Store a v) ->
+        getDecodeElem pc st = (nextPc, Store a v) ->
         Spec h st pc p2m false rob ppc
              h st pc (updQ p2m a (StoreRq v)) true rob ppc
              Internal
   | SpecComStRp:
       forall h st pc p2m rob ppc nextPc a v p2m',
         commit rob = Some (pc, Storeh nextPc a v) ->
-        getHElem pc st = (nextPc, Store a v) ->
+        getDecodeElem pc st = (nextPc, Store a v) ->
         Spec h st pc p2m true rob ppc
              (Storeh pc a v :: h) st nextPc p2m' false rob ppc
              (External StoreRp)
   | SpecComLoadRq:
       forall h st pc p2m rob ppc nextPc a v delS,
         commit rob = Some (pc, Loadh nextPc a v delS) ->
-        getHElem pc st = (nextPc, Load a) ->
+        getDecodeElem pc st = (nextPc, Load a) ->
         Spec h st pc p2m false rob ppc
              h st pc (updQ p2m a LoadCommitRq) true rob ppc
              Internal
   | SpecComLoadRpGood:
       forall h st pc p2m rob ppc nextPc a v delS p2m',
         commit rob = Some (pc, Loadh nextPc a v delS) ->
-        getHElem pc st = (nextPc, Load a) ->
+        getDecodeElem pc st = (nextPc, Load a) ->
         getLoadDelta pc st v = delS ->
         Spec h st pc p2m true rob ppc
              (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m' false rob ppc
@@ -151,7 +151,7 @@ Section PerProc.
   | SpecComLoadRpBad:
       forall h st pc p2m rob ppc nextPc a v delS v' delS' p2m',
         commit rob = Some (pc, Loadh nextPc a v delS) ->
-        getHElem pc st = (nextPc, Load a) ->
+        getDecodeElem pc st = (nextPc, Load a) ->
         v <> v' ->
         getLoadDelta pc st v' = delS' ->
         Spec h st pc p2m true rob ppc
@@ -184,7 +184,7 @@ Section PerProc.
                              (Proc -> ProcState) -> Mem -> Set :=
   | Lod:
       forall p st m a nextPc delS,
-        getHElem (getPc (st p)) (state (st p)) = (nextPc, Load a) ->
+        getDecodeElem (getPc (st p)) (state (st p)) = (nextPc, Load a) ->
         getLoadDelta (getPc (st p)) (state (st p)) (m a) = delS ->
         CorrectSystem
           st m
@@ -192,14 +192,14 @@ Section PerProc.
                                       nextPc (updSt (state (st p)) delS))) m
   | Str:
       forall p st m a nextPc v,
-        getHElem (getPc (st p)) (state (st p)) = (nextPc, Store a v) ->
+        getDecodeElem (getPc (st p)) (state (st p)) = (nextPc, Store a v) ->
         CorrectSystem
           st m
           (updP st p (Build_ProcState (Storeh (getPc (st p)) a v :: (hist (st p)))
                                       nextPc (state (st p)))) (updM m a v)
   | NonMem:
       forall p st m nextPc delS,
-        getHElem (getPc (st p)) (state (st p)) = (nextPc, Nm delS) ->
+        getDecodeElem (getPc (st p)) (state (st p)) = (nextPc, Nm delS) ->
         CorrectSystem
           st m
           (updP st p (Build_ProcState (Nmh (getPc (st p)) delS :: (hist (st p)))
