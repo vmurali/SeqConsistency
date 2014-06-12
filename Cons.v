@@ -102,9 +102,9 @@ Section PerProc.
              h st pc (updQ p2m a (LoadRq tag)) w (issueLoad rob tag) ppc
              Internal
   | SpecLoadRp:
-      forall h st pc p2m w rob ppc tag v,
+      forall h st pc p2m w rob ppc tag v p2m',
         Spec h st pc p2m w rob ppc
-             h st pc p2m w (updLoad rob tag v) ppc
+             h st pc p2m' w (updLoad rob tag v) ppc
              (External (LoadRp tag v))
   | SpecAbort:
       forall h st pc p2m rob ppc pc',
