@@ -120,7 +120,7 @@ Section PerProc.
         commit rob = Some (pc, Nmh nextPc delS) ->
         getDecodeElem pc st = (nextPc, Nm delS) ->
         Spec h st pc p2m false rob ppc
-             (Nmh pc delS :: h) (updSt st delS) nextPc p2m false rob ppc
+             (Nmh pc delS :: h) (updSt st delS) nextPc p2m false (retire rob) ppc
              Internal
   | SpecComStRq:
       forall h st pc p2m rob ppc nextPc a v,
@@ -137,7 +137,7 @@ Section PerProc.
         commit rob = Some (pc, Storeh nextPc a v) ->
         getDecodeElem pc st = (nextPc, Store a v) ->
         Spec h st pc p2m true rob ppc
-             (Storeh pc a v :: h) st nextPc p2m' false rob ppc
+             (Storeh pc a v :: h) st nextPc p2m' false (retire rob) ppc
              (External StoreRp)
   | SpecComLoadRq:
       forall h st pc p2m rob ppc nextPc a v delS,
@@ -155,7 +155,7 @@ Section PerProc.
         getDecodeElem pc st = (nextPc, Load a) ->
         getLoadDelta pc st v = delS ->
         Spec h st pc p2m true rob ppc
-             (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m' false rob ppc
+             (Loadh pc a v delS :: h) (updSt st delS) nextPc p2m' false (retire rob) ppc
              (External (LoadCommitRp v))
   | SpecComLoadRpBad:
       forall h st pc p2m rob ppc nextPc a v delS v' delS' p2m',
