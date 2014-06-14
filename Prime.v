@@ -141,6 +141,9 @@ Section ForAddr.
     apply (cheat _).
   Qed.
 
+  (* Not done yet *)
+
+
   Variable sa: StoreAtomicity reqFn respFn.
 
   Record State :=
@@ -1018,6 +1021,8 @@ Section ForAddr.
 
   CoInductive FullStream: (Rest * State) -> Set :=
   | FCons: forall s s', FullTrans s s' -> FullStream s' -> FullStream s.
+
+  (* Not done yet *)
 
   Require Import JMeq.
   Program CoFixpoint createStream n: FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
