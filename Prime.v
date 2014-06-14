@@ -2,8 +2,6 @@ Set Implicit Arguments.
 
 Require Import DataTypes StoreAtomicity AlwaysEventually NamedTrans Omega Case Useful.
 
-Axiom cheat: forall t, t.
-
 Section ForAddr.
   Variable Rest: Set.
   Variable initRest: Rest.
@@ -52,8 +50,6 @@ Section ForAddr.
       | None => fun pf0: False => match pf0 with end
     end pf.
 
-  Definition reqFn a p := getN (@decOption _) (@getSome _) (alStm a p).
-
   Fixpoint getNState n r (ls: SystemStream r) :=
     match ls with
       | SCons x y _ ls' => match n with
@@ -87,6 +83,23 @@ Section ForAddr.
                            end
     end.
 
+  Lemma semiEq'' n:
+    forall r (ls: SystemStream r) is
+           (als: forall a p, AlwaysEventually (@isSome _) (getReqStream stm a p)),
+      match getNSystem' ls is n with
+        | (t, opti) =>
+          match getInfo t, opti with
+            | Some (a, p, _, w, _), Some i =>
+              desc (getN (@decOption _) (@getSome _) (als a p) i) = w
+            | _, _ => True
+          end
+      end.
+  Proof.
+    admit.
+  Qed.
+
+  Definition reqFn a p := getN (@decOption _) (@getSome _) (alStm a p).
+
   Definition getNSystem n := getNSystem' stm (fun a p => 0) n.
 
   Lemma semiEq' n:
@@ -98,10 +111,9 @@ Section ForAddr.
         end
     end.
   Proof.
-    apply (cheat _).
+    pose proof (semiEq'' n stm (fun a p => 0) alStm).
+    assumption.
   Qed.
-
-  (* Not done yet *)
 
   Lemma getPf' n: forall r (ls: SystemStream r) is,
                     match getNSystem' ls is n with
