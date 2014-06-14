@@ -21,6 +21,26 @@ Section ForAddr.
                            end
     end.
 
+  Lemma stNEq n:
+    forall r (ls: SystemStream r), fst
+                                     match ls with
+                                       | SCons _ _ _ ls' => getNState n ls'
+                                     end = snd (getNState n ls).
+  Proof.
+    induction n.
+    intros.
+    destruct ls.
+    simpl.
+    destruct ls.
+    reflexivity.
+    intros.
+    destruct ls.
+    simpl.
+    specialize (IHn r' ls).
+    simpl in IHn.
+    assumption.
+  Qed.
+
   Fixpoint getNSystem' r (ls: SystemStream r) is n:
     {x: System (fst (getNState n ls))
                (snd (getNState n ls)) *
@@ -1030,24 +1050,9 @@ Section ForAddr.
 
   Next Obligation.
   Proof.
-    unfold getTransSt.
-    induction n.
-    simpl.
-    assert (fst match stm with
-        | SCons _ _ _ (SCons x0 y0 _ _) => (x0, y0)
-        end = snd match stm with
-        | SCons x y _ _ => (x, y)
-        end) by (apply (cheat _)).
-    rewrite H in *.
-    reflexivity.
-    simpl.
-    assert (fst
-      match stm with
-      | SCons _ _ _ (SCons _ y0 _ ls'0) => getNState n ls'0
-      end = snd match stm with
-        | SCons _ y _ ls' => getNState n ls'
-        end) by (apply (cheat _)).
-    rewrite H in *.
+    pose proof (stNEq n stm) as H.
+    rewrite H.
     reflexivity.
   Qed.
+
 End ForAddr.
