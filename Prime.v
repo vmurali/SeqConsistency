@@ -70,26 +70,25 @@ Section ForAddr.
                            end
     end.
 
-  Lemma getPf n: forall r (ls: SystemStream r) is,
-                   match getNSystem' ls is n with
-                     | exist (x, y) _ =>
-                       match getInfo x, y with
-                         | Some _, Some _ => True
-                         | None, None => True
-                         | _, _ => False
-                       end
-                   end.
+  Variable stm: SystemStream initRest.
+
+  Fixpoint getNSystem n := getNSystem' stm (fun a p => 0) n.
+
+  Lemma getPf n: match getNSystem n with
+                   | exist (x, y) _ =>
+                     match getInfo x, y with
+                       | Some _, Some _ => True
+                       | None, None => True
+                       | _, _ => False
+                     end
+                 end.
   Proof.
     intros.
-    destruct (getNSystem' ls is n).
+    destruct (getNSystem n).
     destruct x.
     simpl in *.
     assumption.
   Qed.
-    
-  Variable stm: SystemStream initRest.
-
-  Fixpoint getNSystem n := getNSystem' stm (fun a p => 0) n.
 
   Definition respFn n: option Resp :=
     match getNSystem n with
@@ -1026,7 +1025,8 @@ Section ForAddr.
     pose proof (respEq) as respEqExp.
     unfold getAtomicResp, atomicResp, respFn in respEqExp.
     unfold respFn in semiEq.
-    destruct (getNSystem n) as [x y].
+    pose proof (getPf n) as y.
+    destruct (getNSystem n) as [x _].
     destruct x as [t o].
     simpl in y.
     destruct (getInfo t) as [p|].
