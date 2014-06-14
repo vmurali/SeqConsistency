@@ -70,12 +70,9 @@ Section ForAddr.
     end.
 
   Lemma semiEq' n:
-    match getNSystem n with
-      | (t, opti) =>
-        match getInfo t, opti with
-          | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
-          | _, _ => True
-        end
+    match getInfo (fst (getNSystem n)), snd (getNSystem n) with
+      | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
+      | _, _ => True
     end.
   Proof.
     admit.
@@ -1031,6 +1028,7 @@ Section ForAddr.
     unfold respFn in semiEq.
     pose proof (getPf n) as y.
     destruct (getNSystem n) as [t o].
+    simpl in semiEq'.
     simpl in y.
     destruct (getInfo t) as [p|].
     destruct p as [p ld], p as [p w], p as [p _], p as [a p].
