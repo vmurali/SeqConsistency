@@ -1019,5 +1019,30 @@ Section ForAddr.
   CoInductive FullStream: (Rest * State) -> Set :=
   | FCons: forall s s', FullTrans s s' -> FullStream s' -> FullStream s.
 
-  
+  Require Import JMeq.
+  Program CoFixpoint createStream n: FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
+    FCons (FTrans _ _ (fullEq n)) (createStream (S n)).
+
+  Next Obligation.
+  Proof.
+    unfold getTransSt.
+    induction n.
+    simpl.
+    assert (fst match stm with
+        | SCons _ _ _ (SCons x0 y0 _ _) => (x0, y0)
+        end = snd match stm with
+        | SCons x y _ _ => (x, y)
+        end) by (apply (cheat _)).
+    rewrite H in *.
+    reflexivity.
+    simpl.
+    assert (fst
+      match stm with
+      | SCons _ _ _ (SCons _ y0 _ ls'0) => getNState n ls'0
+      end = snd match stm with
+        | SCons _ y _ ls' => getNState n ls'
+        end) by (apply (cheat _)).
+    rewrite H in *.
+    reflexivity.
+  Qed.
 End ForAddr.
