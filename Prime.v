@@ -62,10 +62,7 @@ Section ForAddr.
                                                              | Some i => i
                                                              | None => 0
                                                            end)
-                                                      match w with
-                                                        | Ld => ld
-                                                        | St => initData a
-                                                      end)
+                                                      ld)
           | None => None
         end
     end.
@@ -75,11 +72,7 @@ Section ForAddr.
       | exist (t, _) _ =>
         match getInfo t, respFn n with
           | Some (a, p, _, w, ld), Some (Build_Resp a' p' _ d) =>
-            a = a' /\ p = p' /\
-            match w with
-              | Ld => d = ld
-              | St => d = initData a
-            end
+            a = a' /\ p = p' /\ ld = d
           | None, None => True
           | _, _ => False
         end
@@ -174,9 +167,31 @@ Section ForAddr.
                                        else next s a' t
                                     ))
   | Idle: AtomicTrans s s.
-  
-  CoInductive AtomicTransList: State -> Set :=
-    | TCons: forall s s', AtomicTrans s s' -> AtomicTransList s' -> AtomicTransList s.
+
+  Inductive AtomicTrans': State -> State -> Set :=
+  | AReq': forall s a c, AtomicTrans' s (Build_State
+                                           (match desc (reqFn a c (next s a c)) with
+                                              | Ld => mem s
+                                              | St => fun a' =>
+                                                        if decAddr a a'
+                                                        then dataQ (reqFn a' c (next s a c))
+                                                        else mem s a'
+                                            end)
+                                           (fun a' t =>
+                                              if decAddr a a'
+                                              then match decProc t c with
+                                                     | left _ => S (next s a' t)
+                                                     | _ => next s a' t
+                                                   end
+                                              else next s a' t
+                                        ))
+  | Idle': forall s, AtomicTrans' s s.
+
+  Definition get' s s' (t: AtomicTrans s s') :=
+    match t with
+      | AReq a c => AReq' s a c
+      | Idle => Idle' s
+    end.
 
   Definition AtomicList := TransList AtomicTrans (Build_State initData (fun a t => 0)).
 
@@ -946,118 +961,63 @@ Section ForAddr.
     apply (obeysP n).
   Qed.
 
-  Lemma fullEq n: match getInfo (fst (getNSystem n)), getTrans getTransNext n with
-                    | Some (a, p, d, w, ld), AReq a' p' =>
-                      a = a' /\ p = p' /\
-                      match w with
-                        | Ld => ld = (mem (lSt (getTransList getTransNext n))) a
-                        | St => ld = initData a
-                      end
-                    | None, Idle => True
-                    | _, _ => False
-                  end.
+  Definition justTrans n :=
+    match getNSystem n with
+      | exist (t, _) _ => t
+    end.
+
+  Lemma fullEq n:
+    match getInfo (justTrans n), get' (getTrans getTransNext n) with
+      | Some (a, p, d, w, ld), AReq' s a' p' =>
+        a = a' /\ p = p' /\
+        match w with
+          | Ld => ld = (mem s) a
+          | St => ld = initData zero
+        end
+      | None, Idle' s => True
+      | _, _ => False
+    end.
   Proof.
+    unfold get'.
+    unfold justTrans; simpl.
     pose proof (semiEq n) as semiEq.
     pose proof (semiEq' n) as semiEq'.
     pose proof (respEq n) as respEq.
-    rewrite respEq in semiEq.
-    unfold getAtomicResp, atomicResp in *.
-    unfold respFn in respEq.
-    destruct (getInfo (fst (getNSystem n))).
-    destruct p, p, p, p.
-    destruct (getTrans getTransNext n).
-    destruct (snd (getNSystem n)).
-    destruct (getTrans getTransNext n).
-    destruct d0.
+    pose proof (respEq) as respEqExp.
+    unfold getAtomicResp, atomicResp, respFn in respEqExp.
+    unfold respFn in semiEq.
+    destruct (getNSystem n) as [x y].
+    destruct x as [t o].
+    simpl in y.
+    destruct (getInfo t) as [p|].
+    destruct p as [p ld], p as [p w], p as [p _], p as [a p].
+    destruct (getTrans getTransNext n) as [a' |].
+    injection respEqExp; intros dEq idEq pEq aEq; clear respEqExp.
+    destruct o as [i|].
+    rewrite <- semiEq', aEq, pEq, <- idEq in *.
+    destruct (desc (reqFn a' c i)); intuition.
     intuition.
-    
-    unfold
-
-  About AReq.
-
-  CoInductive FullTrans: Rest -> State -> Set :=
-    | FCons: forall s1 s2 (ts: System s1 s2) m1 m2
-                    (ta: AtomicTrans m1 m2),
-               match getInfo ts, ta with
-                 | Some (a, p, d, w, ld), AReq a' p' =>
-                   match w with
-                     | Ld => ld = mem m1 a'
-                     | St => ld = initData a
-                   end
-                 | None, Idle => True
-                 | _, _ => False
-               end -> FullTrans s2 m2 -> FullTrans s1 m1.
-
-    
-
-  CoInductive FullTrans:
-    forall s1 s2 (ts: System s1 s2) m1 m2
-           (ta: AtomicTrans m1 m2),
-      match getInfo ts, ta with
-        | Some (a, p, d, w, ld), AReq m1 a' p' =>
-          match w with
-            | Ld => ld = mem m1 a'
-            | St => ld = initData a
-          end
-        | None, Idle => True
-        | _, _ => False
-      end :=.
-*)
-
-  Fixpoint getResp n s (al: AtomicTransList s) :=
-    match n with
-      | 0 => match al with
-               | TCons _ _ atss' als' => atomicResp atss'
-             end
-      | S m => match al with
-                 | TCons _ _ _ als' => getResp m als'
-               end
-    end.
-
-  CoFixpoint buildAl n: AtomicTransList (lSt (getTransList getTransNext n))
-                                         := TCons (getTrans getTransNext n) (buildAl (S n)).
-
-  Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
-  Proof.
-    unfold getAtomicResp.
-    induction n.
-    simpl.
-    reflexivity.
-    intros.
-    simpl.
-    specialize (IHn (S m)).
-
-    assert (eq: n + S m = S (n + m)) by omega.
-    rewrite eq in *.
+    discriminate.
+    destruct (getTrans getTransNext n) as [a' |].
+    discriminate.
     intuition.
   Qed.
 
-  Lemma getRespEq n: getResp n (buildAl 0) = getAtomicResp n.
-  Proof.
-    pose proof (getRespEq' n 0) as sth.
-    assert (eq: n+0 = n) by omega.
-    rewrite eq in *.
-    intuition.
-  Qed.
+  Inductive FullTrans: (Rest * State) -> (Rest * State) -> Set :=
+  | FTrans: forall r1 s1 r2 s2 (ts: System r1 r2) (ta: AtomicTrans' s1 s2),
+              match getInfo ts, ta with
+                | Some (a, p, d, w, ld), AReq' s a' p' =>
+                  a = a' /\ p = p' /\
+                  match w with
+                    | Ld => ld = (mem s) a
+                    | St => ld = initData zero
+                  end
+                | None, Idle' s => True
+                | _, _ => False
+              end -> FullTrans (r1, s1) (r2, s2).
 
-  Record BehAtomicReg :=
-    { atomicBeh: AtomicTransList (Build_State (initData) (fun a t => 0));
-      respMatch: forall n, respFn n = getResp n atomicBeh
-    }.
+  CoInductive FullStream: (Rest * State) -> Set :=
+  | FCons: forall s s', FullTrans s s' -> FullStream s' -> FullStream s.
 
-  Definition getNBeh n := getTransList getTransNext n.
-
-  Definition saBehAtomicReg: BehAtomicReg.
-  Proof.
-    pose (buildAl 0) as one.
-    assert (two: forall n, respFn n = getResp n one).
-    intros.
-    pose proof (getRespEq n) as e1.
-    pose proof (respEq n) as e2.
-    rewrite <- e1 in e2.
-    fold one in e2.
-    assumption.
-    apply (Build_BehAtomicReg one two).
-  Defined.
-
+  
 End ForAddr.
