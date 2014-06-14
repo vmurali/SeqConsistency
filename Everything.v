@@ -93,7 +93,7 @@ Section PerProc.
   (* Transitions for a speculative processor. Only 5 of the last 7 matters, the
    * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
-    (Proc -> SpecState) -> (Proc -> SpecState) -> Prop :=
+    (Proc -> SpecState) -> (Proc -> SpecState) -> Set :=
   | SpecFetch:
       forall f p h st pc p2m w rob ppc,
         f p = (Build_SpecState h st pc p2m w rob ppc) ->
@@ -232,8 +232,19 @@ Section PerProc.
   Definition Rest := (Proc -> SpecState).
   Definition initRest := fun p: Proc => spInit.
   Definition System := Spec.
-  Variable getInfo: forall r1 r2, System r1 r2 ->
-                                    option (Addr * Proc * Data * Desc * Data).
+
+  Definition getInfo r1 r2 (t: System r1 r2) :=
+    match t with
+  | SpecLoadRp f p h st pc p2m w rob ppc tag v p2m' a c1 c2 c3 =>
+    Some (a, p, (initData zero), Ld, v)
+  | SpecComStRp f p h st pc p2m rob ppc nextPc a v p2m' c1 c2 c3 c4 c5 =>
+    Some (a, p, v, St, (initData zero))
+  | SpecComLoadRpGood f p h st pc p2m rob ppc nextPc a v delS p2m' c1 c2 c3 c4 c5 c6 =>
+    Some (a, p, (initData zero), Ld, v)
+  | SpecComLoadRpBad f p h st pc p2m rob ppc nextPc a v delS v' delS' p2m' _ _ _ _ _ _ _ =>
+    Some (a, p, (initData zero), Ld, v')
+  | _ => None
+    end.
 
   CoInductive SystemStream: Rest -> Set :=
     | SCons: forall r r', System r r' -> SystemStream r' -> SystemStream r.
@@ -292,7 +303,7 @@ Section PerProc.
                 | _, _ => False
               end -> Req with
           | Some (_, _, d, w, _) => fun _ => Build_Req w d
-          | None => fun pf => match pf with end
+          | None => fun pf' => match pf' with end
         end pf
     end.
 
@@ -1265,7 +1276,8 @@ Section PerProc.
   | FCons: forall s s', FullTrans s s' -> FullStream s' -> FullStream s.
 
   Require Import JMeq.
-  Program CoFixpoint createStream n: FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
+  Program CoFixpoint createStream n:
+    FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
     FCons (FTrans _ _ (fullEq n)) (createStream (S n)).
 
   Next Obligation.
@@ -1275,5 +1287,7 @@ Section PerProc.
     rewrite <- H.
     reflexivity.
   Qed.
+
+  
 
 End PerProc.
