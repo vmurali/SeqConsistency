@@ -13,6 +13,47 @@ Section ForAddr.
   CoInductive SystemStream: Rest -> Set :=
     | SCons: forall r r', System r r' -> SystemStream r' -> SystemStream r.
 
+  Variable stm: SystemStream initRest.
+
+  CoFixpoint getReqStream r (rs: SystemStream r) :=
+    match rs with
+      | SCons _ _ t rs' =>
+        match getInfo t with
+          | Some (a, p, d, w, _) =>
+            fun a' p'  =>
+              match decAddr a a', decProc p p' with
+                | left _, left _ =>
+                  Cons (Some (Build_Req w d)) (getReqStream rs' a' p')
+                | _, _ => Cons None (getReqStream rs' a' p')
+              end
+          | None => fun a' p' => Cons None (getReqStream rs' a' p')
+        end
+    end.
+
+  Definition isSome A (x: option A) :=
+    match x with
+      | Some y => True
+      | _ => False
+    end.
+
+  Variable alStm: forall a p, AlwaysEventually (@isSome _) (getReqStream stm a p).
+
+  Theorem decOption A (x: option A): {isSome x} + {~ isSome x}.
+  Proof.
+    unfold isSome; destruct x; intuition.
+  Qed.
+
+  Definition getSome A (x: option A) (pf: isSome x): A :=
+    match x as x0 return match x0 with
+                           | Some _ => True
+                           | None => False
+                         end -> A with
+      | Some a => fun _ => a
+      | None => fun pf0: False => match pf0 with end
+    end pf.
+
+  Definition reqFn a p := getN (@decOption _) (@getSome _) (alStm a p).
+
   Fixpoint getNState n r (ls: SystemStream r) :=
     match ls with
       | SCons x y _ ls' => match n with
@@ -20,26 +61,6 @@ Section ForAddr.
                              | S m => getNState m ls'
                            end
     end.
-
-  Lemma stNEq n:
-    forall r (ls: SystemStream r), fst
-                                     match ls with
-                                       | SCons _ _ _ ls' => getNState n ls'
-                                     end = snd (getNState n ls).
-  Proof.
-    induction n.
-    intros.
-    destruct ls.
-    simpl.
-    destruct ls.
-    reflexivity.
-    intros.
-    destruct ls.
-    simpl.
-    specialize (IHn r' ls).
-    simpl in IHn.
-    assumption.
-  Qed.
 
   Fixpoint getNSystem' r (ls: SystemStream r) is n:
     System (fst (getNState n ls))
@@ -65,6 +86,22 @@ Section ForAddr.
                                         end m
                            end
     end.
+
+  Definition getNSystem n := getNSystem' stm (fun a p => 0) n.
+
+  Lemma semiEq' n:
+    match getNSystem n with
+      | (t, opti) =>
+        match getInfo t, opti with
+          | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
+          | _, _ => True
+        end
+    end.
+  Proof.
+    apply (cheat _).
+  Qed.
+
+  (* Not done yet *)
 
   Lemma getPf' n: forall r (ls: SystemStream r) is,
                     match getNSystem' ls is n with
@@ -97,9 +134,28 @@ Section ForAddr.
     assumption.
   Qed.
 
-  Variable stm: SystemStream initRest.
+  Lemma stNEq n:
+    forall r (ls: SystemStream r), fst
+                                     match ls with
+                                       | SCons _ _ _ ls' => getNState n ls'
+                                     end = snd (getNState n ls).
+  Proof.
+    induction n.
+    intros.
+    destruct ls.
+    simpl.
+    destruct ls.
+    reflexivity.
+    intros.
+    destruct ls.
+    simpl.
+    specialize (IHn r' ls).
+    simpl in IHn.
+    assumption.
+  Qed.
 
-  Definition getNSystem n := getNSystem' stm (fun a p => 0) n.
+
+
 
   Lemma getPf n: match getNSystem n with
                    | (x, y) =>
@@ -149,60 +205,6 @@ Section ForAddr.
     destruct d0; intuition.
     intuition.
   Qed.
-
-  CoFixpoint getReqStream r (rs: SystemStream r) :=
-    match rs with
-      | SCons _ _ t rs' =>
-        match getInfo t with
-          | Some (a, p, d, w, _) =>
-            fun a' p'  =>
-              match decAddr a a', decProc p p' with
-                | left _, left _ =>
-                  Cons (Some (Build_Req w d)) (getReqStream rs' a' p')
-                | _, _ => Cons None (getReqStream rs' a' p')
-              end
-          | None => fun a' p' => Cons None (getReqStream rs' a' p')
-        end
-    end.
-
-  Definition isSome A (x: option A) :=
-    match x with
-      | Some y => True
-      | _ => False
-    end.
-
-  Variable alStm: forall a p, AlwaysEventually (@isSome _) (getReqStream stm a p).
-
-  Theorem decOption A (x: option A): {isSome x} + {~ isSome x}.
-  Proof.
-    unfold isSome; destruct x; intuition.
-  Qed.
-
-  Definition getSome A (x: option A) (pf: isSome x): A :=
-    match x as x0 return match x0 with
-                           | Some _ => True
-                           | None => False
-                         end -> A with
-      | Some a => fun _ => a
-      | None => fun pf0: False => match pf0 with end
-    end pf.
-
-  Definition reqFn a p := getN (@decOption _) (@getSome _) (alStm a p).
-
-  Lemma semiEq' n:
-    match getNSystem n with
-      | (t, opti) =>
-        match getInfo t, opti with
-          | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
-          | _, _ => True
-        end
-    end.
-  Proof.
-    apply (cheat _).
-  Qed.
-
-  (* Not done yet *)
-
 
   Variable sa: StoreAtomicity reqFn respFn.
 
