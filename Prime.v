@@ -1,6 +1,6 @@
 Set Implicit Arguments.
 
-Require Import DataTypes StoreAtomicity AlwaysEventually NamedTrans Omega Case Useful.
+Require Import DataTypes StoreAtomicity NamedTrans Omega Case Useful.
 
 Section ForAddr.
   Variable Rest: Set.
@@ -12,43 +12,6 @@ Section ForAddr.
     | SCons: forall r r', System r r' -> SystemStream r' -> SystemStream r.
 
   Variable stm: SystemStream initRest.
-
-  CoFixpoint getReqStream r (rs: SystemStream r) :=
-    match rs with
-      | SCons _ _ t rs' =>
-        match getInfo t with
-          | Some (a, p, d, w, _) =>
-            fun a' p'  =>
-              match decAddr a a', decProc p p' with
-                | left _, left _ =>
-                  Cons (Some (Build_Req w d)) (getReqStream rs' a' p')
-                | _, _ => Cons None (getReqStream rs' a' p')
-              end
-          | None => fun a' p' => Cons None (getReqStream rs' a' p')
-        end
-    end.
-
-  Definition isSome A (x: option A) :=
-    match x with
-      | Some y => True
-      | _ => False
-    end.
-
-  Variable alStm: forall a p, AlwaysEventually (@isSome _) (getReqStream stm a p).
-
-  Theorem decOption A (x: option A): {isSome x} + {~ isSome x}.
-  Proof.
-    unfold isSome; destruct x; intuition.
-  Qed.
-
-  Definition getSome A (x: option A) (pf: isSome x): A :=
-    match x as x0 return match x0 with
-                           | Some _ => True
-                           | None => False
-                         end -> A with
-      | Some a => fun _ => a
-      | None => fun pf0: False => match pf0 with end
-    end pf.
 
   Fixpoint getNState n r (ls: SystemStream r) :=
     match ls with
@@ -83,24 +46,28 @@ Section ForAddr.
                            end
     end.
 
-  Lemma semiEq'' n:
-    forall r (ls: SystemStream r) is
-           (als: forall a p, AlwaysEventually (@isSome _) (getReqStream stm a p)),
-      match getNSystem' ls is n with
-        | (t, opti) =>
-          match getInfo t, opti with
-            | Some (a, p, _, w, _), Some i =>
-              desc (getN (@decOption _) (@getSome _) (als a p) i) = w
-            | _, _ => True
-          end
-      end.
-  Proof.
-    admit.
-  Qed.
-
-  Definition reqFn a p := getN (@decOption _) (@getSome _) (alStm a p).
-
   Definition getNSystem n := getNSystem' stm (fun a p => 0) n.
+
+  Variable allPresent:
+    forall a p i,
+      {n |
+       match getInfo (fst (getNSystem n)), snd (getNSystem n) with
+         | Some (a', p', _, _, _), Some i' => a = a' /\ p = p' /\ i = i'
+         | _, _ => False
+       end}.
+
+  Definition reqFn a p i :=
+    match allPresent a p i with
+      | exist n pf =>
+        match getInfo (fst (getNSystem n)) as y return
+              match y, snd (getNSystem n) with
+                | Some (a', p', _, _, _), Some i' => a = a' /\ p = p' /\ i = i'
+                | _, _ => False
+              end -> Req with
+          | Some (_, _, d, w, _) => fun _ => Build_Req w d
+          | None => fun pf => match pf with end
+        end pf
+    end.
 
   Lemma semiEq' n:
     match getNSystem n with
@@ -111,8 +78,7 @@ Section ForAddr.
         end
     end.
   Proof.
-    pose proof (semiEq'' n stm (fun a p => 0) alStm).
-    assumption.
+    admit.
   Qed.
 
   Lemma getPf' n: forall r (ls: SystemStream r) is,
