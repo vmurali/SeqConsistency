@@ -215,6 +215,10 @@ Section PerProc.
    * or some such useless work, I don't do any useful work here *)
   | Nothing: forall st m, CorrectSystem st m st m.
 
+  CoInductive CorrectStream: (Proc->ProcState) -> Mem -> Set :=
+  | CCons: forall p m p' m', CorrectSystem p m p' m' -> CorrectStream p' m' ->
+                             CorrectStream p m.
+
   Variable initPc: Pc.
   Variable initState: PState.
   Variable initRob: Rob.
@@ -307,13 +311,84 @@ Section PerProc.
         end pf
     end.
 
+  Ltac unpair :=
+    repeat match goal with
+             | [ |- context[match ?E with pair _ _ => _ end] ] => destruct E
+             | [ _ : context[match ?E with pair _ _ => _ end] |- _ ] => destruct E
+           end.
+
+
+  Lemma getNSystem'_monotone : forall a p d w d' i n r (ls : SystemStream r) is,
+    getInfo (fst (getNSystem' ls is n)) = Some (a, p, d, w, d')
+    -> snd (getNSystem' ls is n) = Some i
+    -> i >= is a p.
+  Proof.
+    induction n; destruct ls; simpl; intuition.
+
+    rewrite H in *.
+    injection H0; intros; subst.
+    eauto.
+
+    apply IHn in H; auto.
+    destruct (getInfo s); eauto.
+    unpair.
+    destruct (decAddr a0 a); subst; eauto.
+    destruct (decProc p0 p); subst; eauto.
+    omega.
+  Qed.
+
+  Lemma getInfo_inj' : forall n m r (ls : SystemStream r) is a p d w d' d0 w0 d'0 i,
+    getInfo (fst (getNSystem' ls is n)) = Some (a, p, d, w, d')
+    -> snd (getNSystem' ls is n) = Some i
+    -> getInfo (fst (getNSystem' ls is m)) = Some (a, p, d0, w0, d'0)
+    -> snd (getNSystem' ls is m) = Some i
+    -> n = m.
+  Proof.
+    induction n; destruct m; destruct ls; simpl; intuition eauto.
+
+    rewrite H in *.
+    injection H0; clear H0; intros; subst.
+    eapply getNSystem'_monotone in H1; eauto.
+    destruct (decAddr a a); intuition.
+    destruct (decProc p p); intuition.
+
+    rewrite H1 in *.
+    injection H2; clear H2; intros; subst.
+    eapply getNSystem'_monotone in H; eauto.
+    destruct (decAddr a a); intuition.
+    destruct (decProc p p); intuition.
+  Qed.
+
+  Theorem getInfo_inj : forall n m a p d w d' d0 w0 d'0 i,
+    getInfo (fst (getNSystem n)) = Some (a, p, d, w, d')
+    -> snd (getNSystem n) = Some i
+    -> getInfo (fst (getNSystem m)) = Some (a, p, d0, w0, d'0)
+    -> snd (getNSystem m) = Some i
+    -> n = m.
+  Proof.
+    eauto using getInfo_inj'.
+  Qed.
+
   Lemma semiEq' n:
     match getInfo (fst (getNSystem n)), snd (getNSystem n) with
       | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
       | _, _ => True
     end.
   Proof.
-    admit.
+    unfold reqFn.
+    case_eq (getInfo (fst (getNSystem n))); intros; auto.
+    unpair.
+    case_eq (snd (getNSystem n)); intros; auto.
+    destruct (allPresent a p n0).
+    assert (x = n).
+    specialize (getInfo_inj x n).
+    destruct (getInfo (fst (getNSystem x))); intuition.
+    generalize dependent y; unpair.
+    destruct (snd (getNSystem x)); simpl; intuition.
+    subst; eauto.
+    subst.
+    generalize dependent (getInfo (fst (getNSystem n))); intros; subst.
+    auto.
   Qed.
 
   Lemma getPf' n: forall r (ls: SystemStream r) is,
@@ -1288,6 +1363,13 @@ Section PerProc.
     reflexivity.
   Qed.
 
-  
+  Fixpoint getNStateFull n rs (ls: FullStream rs) :=
+    match ls with
+      | FCons x x' _ ls' =>
+        match n with
+          | 0 => x
+          | S m => getNStateFull m ls'
+        end
+    end.
 
 End PerProc.
