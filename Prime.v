@@ -42,20 +42,16 @@ Section ForAddr.
   Qed.
 
   Fixpoint getNSystem' r (ls: SystemStream r) is n:
-    {x: System (fst (getNState n ls))
+    System (fst (getNState n ls))
                (snd (getNState n ls)) *
-        option nat | match getInfo (fst x), snd x with
-                       | Some _, Some _ => True
-                       | None, None => True
-                       | _, _ => False
-                     end} :=
+        option nat :=
     match ls with
       | SCons _ _ t ls' => match n with
-                             | 0 => exist _ (t,
+                             | 0 => (t,
                                      match getInfo t with
                                        | Some (a, p, _, _, _) => Some (is a p)
                                        | None => None
-                                     end) (cheat _)
+                                     end)
                              | S m => getNSystem'
                                         ls'
                                         match getInfo t with
@@ -70,12 +66,43 @@ Section ForAddr.
                            end
     end.
 
+  Lemma getPf' n: forall r (ls: SystemStream r) is,
+                    match getNSystem' ls is n with
+                      | (x, y) =>
+                        match getInfo x, y with
+                          | Some _, Some _ => True
+                          | None, None => True
+                          | _, _ => False
+                        end
+                    end.
+  Proof.
+    induction n.
+    intros.
+    destruct ls.
+    simpl.
+    destruct (getInfo s).
+    destruct p, p, p, p; intuition.
+    intuition.
+    intros.
+    simpl.
+    destruct ls.
+    specialize (IHn _ ls match getInfo s with
+         | Some (a, p, _, _, _) =>
+             fun (a' : Addr) (p' : Proc) =>
+             if decAddr a a'
+             then if decProc p p' then S (is a' p') else is a' p'
+             else is a' p'
+         | None => fun (a' : Addr) (p' : Proc) => is a' p'
+         end).
+    assumption.
+  Qed.
+
   Variable stm: SystemStream initRest.
 
-  Fixpoint getNSystem n := getNSystem' stm (fun a p => 0) n.
+  Definition getNSystem n := getNSystem' stm (fun a p => 0) n.
 
   Lemma getPf n: match getNSystem n with
-                   | exist (x, y) _ =>
+                   | (x, y) =>
                      match getInfo x, y with
                        | Some _, Some _ => True
                        | None, None => True
@@ -83,16 +110,13 @@ Section ForAddr.
                      end
                  end.
   Proof.
-    intros.
-    destruct (getNSystem n).
-    destruct x.
-    simpl in *.
+    pose proof (getPf' n stm (fun a p => 0)).
     assumption.
   Qed.
 
   Definition respFn n: option Resp :=
     match getNSystem n with
-      | exist (t, opti) _ => 
+      | (t, opti) => 
         match getInfo t with
           | Some (a, p, d, w, ld) => Some (Build_Resp a p (match opti with
                                                              | Some i => i
@@ -105,7 +129,7 @@ Section ForAddr.
 
   Lemma semiEq n:
     match getNSystem n with
-      | exist (t, _) _ =>
+      | (t, _) =>
         match getInfo t, respFn n with
           | Some (a, p, _, w, ld), Some (Build_Resp a' p' _ d) =>
             a = a' /\ p = p' /\ ld = d
@@ -116,7 +140,7 @@ Section ForAddr.
   Proof.
     unfold respFn.
     simpl.
-    destruct (getNSystem n) as [[t s] _].
+    destruct (getNSystem n) as [t s].
     destruct (getInfo t).
     destruct p.
     destruct p.
@@ -167,7 +191,7 @@ Section ForAddr.
 
   Lemma semiEq' n:
     match getNSystem n with
-      | exist (t, opti) _ =>
+      | (t, opti) =>
         match getInfo t, opti with
           | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
           | _, _ => True
@@ -1002,7 +1026,7 @@ Section ForAddr.
 
   Definition justTrans n :=
     match getNSystem n with
-      | exist (t, _) _ => t
+      | (t, _) => t
     end.
 
   Lemma fullEq n:
@@ -1026,8 +1050,7 @@ Section ForAddr.
     unfold getAtomicResp, atomicResp, respFn in respEqExp.
     unfold respFn in semiEq.
     pose proof (getPf n) as y.
-    destruct (getNSystem n) as [x _].
-    destruct x as [t o].
+    destruct (getNSystem n) as [t o].
     simpl in y.
     destruct (getInfo t) as [p|].
     destruct p as [p ld], p as [p w], p as [p _], p as [a p].
