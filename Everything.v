@@ -1,5 +1,5 @@
 Require Import DataTypes StoreAtomicity AlwaysEventually AtomicRegIfc AtomicRegThm AtomicReg.
-Require Import List Arith NamedTrans Useful.
+Require Import List Arith NamedTrans Useful Coq.Logic.FunctionalExtensionality.
 
 Set Implicit Arguments.
 
@@ -90,7 +90,7 @@ Section PerProc.
       ppc: Ppc
     }.
 
-  (* Transitions for a speculative processor. Only 5 of the last 7 matters, the
+  (* Transitions for a speculative processor. Only 3 of the last 7 matters, the
    * rest are there to occupy space and make everyone mad *)
   Inductive Spec:
     (Proc -> SpecState) -> (Proc -> SpecState) -> Set :=
@@ -219,6 +219,14 @@ Section PerProc.
   | CCons: forall p m p' m', CorrectSystem p m p' m' -> CorrectStream p' m' ->
                              CorrectStream p m.
 
+  Fixpoint getNStateCorrect st m (ls: CorrectStream st m) n :=
+    match ls with
+      | CCons p m _ _ t ls' => match n with
+                                 | 0 => (p, m)
+                                 | S x => getNStateCorrect ls' x
+                               end
+    end.
+
   Variable initPc: Pc.
   Variable initState: PState.
   Variable initRob: Rob.
@@ -239,15 +247,15 @@ Section PerProc.
 
   Definition getInfo r1 r2 (t: System r1 r2) :=
     match t with
-  | SpecLoadRp f p h st pc p2m w rob ppc tag v p2m' a c1 c2 c3 =>
-    Some (a, p, (initData zero), Ld, v)
-  | SpecComStRp f p h st pc p2m rob ppc nextPc a v p2m' c1 c2 c3 c4 c5 =>
-    Some (a, p, v, St, (initData zero))
-  | SpecComLoadRpGood f p h st pc p2m rob ppc nextPc a v delS p2m' c1 c2 c3 c4 c5 c6 =>
-    Some (a, p, (initData zero), Ld, v)
-  | SpecComLoadRpBad f p h st pc p2m rob ppc nextPc a v delS v' delS' p2m' _ _ _ _ _ _ _ =>
-    Some (a, p, (initData zero), Ld, v')
-  | _ => None
+      | SpecLoadRp f p h st pc p2m w rob ppc tag v p2m' a c1 c2 c3 =>
+        Some (a, p, (initData zero), Ld, v)
+      | SpecComStRp f p h st pc p2m rob ppc nextPc a v p2m' c1 c2 c3 c4 c5 =>
+        Some (a, p, v, St, (initData zero))
+      | SpecComLoadRpGood f p h st pc p2m rob ppc nextPc a v delS p2m' c1 c2 c3 c4 c5 c6 =>
+        Some (a, p, (initData zero), Ld, v)
+      | SpecComLoadRpBad f p h st pc p2m rob ppc nextPc a v delS v' _ _ _ _ _ _ _ _ _ =>
+        Some (a, p, (initData zero), Ld, v')
+      | _ => None
     end.
 
   CoInductive SystemStream: Rest -> Set :=
@@ -371,7 +379,7 @@ Section PerProc.
 
   Lemma semiEq' n:
     match getInfo (fst (getNSystem n)), snd (getNSystem n) with
-      | Some (a, p, _, w, _), Some i => desc (reqFn a p i) = w
+      | Some (a, p, d, w, _), Some i => desc (reqFn a p i) = w /\ dataQ (reqFn a p i) = d
       | _, _ => True
     end.
   Proof.
@@ -1299,7 +1307,8 @@ Section PerProc.
   Lemma fullEq n:
     match getInfo (justTrans n), get' (getTrans getTransNext n) with
       | Some (a, p, d, w, ld), AReq' s a' p' =>
-        a = a' /\ p = p' /\
+        a = a' /\ p = p' /\ w = desc (reqFn a' p' (next s a' p')) /\
+        d = dataQ (reqFn a' p' (next s a' p')) /\
         match w with
           | Ld => ld = (mem s) a
           | St => ld = initData zero
@@ -1321,11 +1330,12 @@ Section PerProc.
     simpl in semiEq'.
     simpl in y.
     destruct (getInfo t) as [p|].
-    destruct p as [p ld], p as [p w], p as [p _], p as [a p].
+    destruct p as [p ld], p as [p w], p as [p d], p as [a p].
     destruct (getTrans getTransNext n) as [a' |].
     injection respEqExp; intros dEq idEq pEq aEq; clear respEqExp.
     destruct o as [i|].
-    rewrite <- semiEq', aEq, pEq, <- idEq in *.
+    destruct semiEq' as [wEq xEq].
+    rewrite <- xEq, <- wEq, aEq, pEq, <- idEq in *.
     destruct (desc (reqFn a' c i)); intuition.
     intuition.
     discriminate.
@@ -1338,7 +1348,8 @@ Section PerProc.
   | FTrans: forall r1 s1 r2 s2 (ts: System r1 r2) (ta: AtomicTrans' s1 s2),
               match getInfo ts, ta with
                 | Some (a, p, d, w, ld), AReq' s a' p' =>
-                  a = a' /\ p = p' /\
+                  a = a' /\ p = p' /\ w = desc (reqFn a' p' (next s a' p')) /\
+                  d = dataQ (reqFn a' p' (next s a' p')) /\
                   match w with
                     | Ld => ld = (mem s) a
                     | St => ld = initData zero
@@ -1363,14 +1374,568 @@ Section PerProc.
     reflexivity.
   Qed.
 
-  Fixpoint getNStateFull n rs (ls: FullStream rs) :=
+  Fixpoint getNStateFull rs (ls: FullStream rs) n :=
     match ls with
       | FCons x x' _ ls' =>
         match n with
           | 0 => x
-          | S m => getNStateFull m ls'
+          | S m => getNStateFull ls' m
         end
     end.
 
+  Section extension.
+    Variable f: Proc -> SpecState.
+    Variable p: Proc.
+    Variable v: SpecState.
+    Variable hyp: forall p0, {| hist := hist' (f p0);
+                                getPc := pc (f p0);
+                                state := st (f p0) |} =
+                             {| hist := hist' (upd f p v p0);
+                                getPc := pc (upd f p v p0);
+                                state := st (upd f p v p0) |}.
+
+    Theorem exten: (fun p0 => {| hist := hist' (f p0);
+                                 getPc := pc (f p0);
+                                 state := st (f p0) |}) =
+                   fun p0 => {| hist := hist' (upd f p v p0);
+                                getPc := pc (upd f p v p0);
+                                state := st (upd f p v p0) |}.
+    Proof.
+      generalize hyp; clear; intros.
+      assert (forall x, ((fun p0 => {| hist := hist' (f p0);
+                                       getPc := pc (f p0);
+                                       state := st (f p0) |}) x) =
+                        (fun p0 => {| hist := hist' (upd f p v p0);
+                                      getPc := pc (upd f p v p0);
+                                      state := st (upd f p v p0) |}) x) by intuition.
+      apply (functional_extensionality).
+      intuition.
+    Qed.
+  End extension.
+
+  Definition buildTrans b e (fs: FullTrans b e) :
+    CorrectSystem
+      (fun p => Build_ProcState (hist' (fst b p)) (pc (fst b p))
+                                (st (fst b p))) (mem (snd b))
+      (fun p => Build_ProcState (hist' (fst e p)) (pc (fst e p))
+                                (st (fst e p))) (mem (snd e)).
+
+  Proof.
+    Ltac mkEqual f p v :=
+      assert (forall p0,
+                 {| hist := hist' (f p0);
+                    getPc := pc (f p0);
+                    state := st (f p0) |}
+               = {| hist := hist' (upd f p v p0);
+                    getPc := pc (upd f p v p0);
+                    state := st (upd f p v p0) |}) by
+        ( intros p0;
+          unfold upd;
+          destruct (decProc p p0);
+          match goal with
+            | H: p = p0, G: f p = ?Q |- _ => rewrite <- H in *; simpl in *; rewrite G in *;
+                                             reflexivity
+            | H: p <> p0 |- _ => reflexivity
+          end).
+
+    Ltac tryIdleBase :=
+      match goal with
+        | s1: State |- context [ fun (p0: Proc) =>
+                                   {| hist := hist' (upd ?f ?p ?v p0);
+                                      getPc := pc (upd ?f ?p ?v p0);
+                                      state := st (upd ?f ?p ?v p0)
+                                   |}] =>
+          mkEqual f p v;
+            match goal with
+              | H: forall (p: Proc), {| hist := _; getPc := _; state := _ |} = _ |- _ =>
+                pose proof (exten f p v H); clear H
+            end;
+            pose proof (Nothing (fun p0 : Proc =>
+                                   {| hist := hist' (f p0);
+                                      getPc := pc (f p0); state := st (f p0) |}) (mem s1))
+
+      end.
+
+    Ltac tryIdle :=
+      tryIdleBase;
+      match goal with
+        | H: (fun p0 => _) = fun px => _ |- _ =>
+          rewrite <- H in *; clear H
+      end.
+
+
+    destruct fs; unfold getInfo in *; destruct ts; simpl.
+
+    tryIdle; destruct ta; intuition.
+    tryIdle; destruct ta; intuition.
+    tryIdle; destruct ta; intuition.
+
+    tryIdle.
+    destruct ta; simpl in *.
+    destruct y as [u1 [u2 [u3 u4]]].
+    rewrite u1, u2, <- u3 in *.
+    destruct (desc (reqFn a0 c (next s a0 c))); intuition.
+    intuition.
+
+    tryIdle; destruct ta; intuition.
+
+    destruct ta.
+    intuition.
+    pose proof (NonMem p (fun p0 => {| hist := hist' (f p0); getPc := pc (f p0);
+                                       state := st (f p0)|}) (mem s)); simpl in *.
+    rewrite e1 in H; simpl in *.
+    specialize (H _ _ e0); simpl in *.
+
+    assert (good: upd
+              (fun p0 : Proc =>
+                 {|
+                   hist := hist' (f p0);
+                   getPc := pc (f p0);
+                   state := st (f p0) |}) p
+              {|
+                hist := Nmh pc0 delS :: h;
+                getPc := nextPc;
+                state := updSt st0 delS |} =
+            fun p0 => {|
+                hist := hist'
+                          (upd f p
+                               {|
+                                 hist' := Nmh pc0 delS :: h;
+                                 st := updSt st0 delS;
+                                 pc := nextPc;
+                                 p2m := p2m0;
+                                 wait := false;
+                                 rob := retire rob0;
+                                 ppc := ppc0 |} p0);
+                getPc := pc
+                           (upd f p
+                                {|
+                                  hist' := Nmh pc0 delS :: h;
+                                  st := updSt st0 delS;
+                                  pc := nextPc;
+                                  p2m := p2m0;
+                                  wait := false;
+                                  rob := retire rob0;
+                                  ppc := ppc0 |} p0);
+                state := st
+                           (upd f p
+                                {|
+                                  hist' := Nmh pc0 delS :: h;
+                                  st := updSt st0 delS;
+                                  pc := nextPc;
+                                  p2m := p2m0;
+                                  wait := false;
+                                  rob := retire rob0;
+                                  ppc := ppc0 |} p0) |}) by (
+    unfold upd;
+    assert
+      (forall p0,
+         (if decProc p p0
+          then
+            {|
+              hist := Nmh pc0 delS :: h;
+              getPc := nextPc;
+              state := updSt st0 delS |}
+          else {| hist := hist' (f p0); getPc := pc (f p0); state := st (f p0) |}) =
+         {|
+           hist := hist'
+                     (if decProc p p0
+                      then
+                        {|
+                          hist' := Nmh pc0 delS :: h;
+                          st := updSt st0 delS;
+                          pc := nextPc;
+                          p2m := p2m0;
+                          wait := false;
+                          rob := retire rob0;
+                          ppc := ppc0 |}
+                      else f p0);
+           getPc := pc
+                      (if decProc p p0
+                       then
+                         {|
+                           hist' := Nmh pc0 delS :: h;
+                           st := updSt st0 delS;
+                           pc := nextPc;
+                           p2m := p2m0;
+                           wait := false;
+                           rob := retire rob0;
+                           ppc := ppc0 |}
+                       else f p0);
+           state := st
+                      (if decProc p p0
+                       then
+                         {|
+                           hist' := Nmh pc0 delS :: h;
+                           st := updSt st0 delS;
+                           pc := nextPc;
+                           p2m := p2m0;
+                           wait := false;
+                           rob := retire rob0;
+                           ppc := ppc0 |}
+                       else f p0) |}) by (
+                                          intros p0;
+                                          destruct (decProc p p0);
+                                          reflexivity);
+    apply (functional_extensionality); intuition).
+
+    rewrite <- good in *; clear good.
+    intuition.
+
+    tryIdle; destruct ta; intuition.
+
+
+    destruct ta.
+    destruct y as [u1 [u2 [u3 [u4 u5]]]].
+    simpl in *.
+    pose proof (Str p (fun p0 => {| hist := hist' (f p0); getPc := pc (f p0);
+                                       state := st (f p0)|}) (mem s)); simpl in *.
+    rewrite u1, u2, <- u3 in *; simpl in *.
+    rewrite e3 in *.
+    unfold updM in H.
+    specialize (H _ _ _ e2); simpl in *.
+
+    assert ((upd
+           (fun p0 : Proc =>
+            {|
+            hist := hist' (f p0);
+            getPc := pc (f p0);
+            state := st (f p0) |}) c
+           {| hist := Storeh pc0 a0 v :: h; getPc := nextPc; state := st0 |}) =
+            (fun p0 : Proc =>
+               {|
+                 hist := hist'
+                           (upd f c
+                                {|
+                                  hist' := Storeh pc0 a0 v :: h;
+                                  st := st0;
+                                  pc := nextPc;
+                                  p2m := p2m';
+                                  wait := false;
+                                  rob := retire rob0;
+                                  ppc := ppc0 |} p0);
+                 getPc := pc
+                            (upd f c
+                                 {|
+                                   hist' := Storeh pc0 a0 v :: h;
+                                   st := st0;
+                                   pc := nextPc;
+                                   p2m := p2m';
+                                   wait := false;
+                                   rob := retire rob0;
+                                   ppc := ppc0 |} p0);
+                 state := st
+                            (upd f c
+                                 {|
+                                   hist' := Storeh pc0 a0 v :: h;
+                                   st := st0;
+                                   pc := nextPc;
+                                   p2m := p2m';
+                                   wait := false;
+                                   rob := retire rob0;
+                                   ppc := ppc0 |} p0) |})).
+    unfold upd in *.
+    assert (forall p0,
+        (if decProc c p0
+         then
+          {| hist := Storeh pc0 a0 v :: h; getPc := nextPc; state := st0 |}
+         else
+          {| hist := hist' (f p0); getPc := pc (f p0); state := st (f p0) |}) =
+           {|
+    hist := hist'
+              (if decProc c p0
+               then
+                {|
+                hist' := Storeh pc0 a0 v :: h;
+                st := st0;
+                pc := nextPc;
+                p2m := p2m';
+                wait := false;
+                rob := retire rob0;
+                ppc := ppc0 |}
+               else f p0);
+    getPc := pc
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Storeh pc0 a0 v :: h;
+                 st := st0;
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := retire rob0;
+                 ppc := ppc0 |}
+                else f p0);
+    state := st
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Storeh pc0 a0 v :: h;
+                 st := st0;
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := retire rob0;
+                 ppc := ppc0 |}
+                else f p0) |}) by
+        (intros p0; destruct (decProc c p0); reflexivity).
+    apply (functional_extensionality); intuition.
+
+    rewrite <- H0 in *; clear H0.
+
+    assert ((fun a' => if decAddr a0 a' then dataQ (reqFn a' c (next s a0 c)) else mem s a') =
+           fun a' => if decAddr a0 a' then dataQ (reqFn a0 c (next s a0 c)) else mem s a').
+    assert (forall a', (if decAddr a0 a' then
+                          dataQ (reqFn a' c (next s a0 c)) else mem s a') =
+             if decAddr a0 a' then dataQ (reqFn a0 c (next s a0 c)) else mem s a').
+    intros a'.
+    destruct (decAddr a0 a').
+    rewrite e4 in *.
+    reflexivity.
+    reflexivity.
+    apply (functional_extensionality); intuition.
+    rewrite H0 in *.
+    rewrite <- u4 in *.
+    assumption.
+    intuition.
+
+    tryIdle; destruct ta; intuition.
+
+
+
+
+    destruct ta.
+    destruct y as [u1 [u2 [u3 [u4 u5]]]].
+    simpl in *.
+    pose proof (Lod p (fun p0 => {| hist := hist' (f p0); getPc := pc (f p0);
+                                       state := st (f p0)|}) (mem s)); simpl in *.
+    rewrite u1, u2, <- u3, u5 in *; simpl in *.
+    rewrite e4 in *.
+    simpl in *.
+    specialize (H _ _ _ e2 e3); simpl in *.
+
+    assert ( (upd
+           (fun p0 : Proc =>
+            {|
+            hist := hist' (f p0);
+            getPc := pc (f p0);
+            state := st (f p0) |}) c
+           {|
+           hist := Loadh pc0 a0 (mem s a0) delS :: h;
+           getPc := nextPc;
+           state := updSt st0 delS |}) = (fun p0 : Proc =>
+      {|
+      hist := hist'
+                (upd f c
+                   {|
+                   hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                   st := updSt st0 delS;
+                   pc := nextPc;
+                   p2m := p2m';
+                   wait := false;
+                   rob := retire rob0;
+                   ppc := ppc0 |} p0);
+      getPc := pc
+                 (upd f c
+                    {|
+                    hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                    st := updSt st0 delS;
+                    pc := nextPc;
+                    p2m := p2m';
+                    wait := false;
+                    rob := retire rob0;
+                    ppc := ppc0 |} p0);
+      state := st
+                 (upd f c
+                    {|
+                    hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                    st := updSt st0 delS;
+                    pc := nextPc;
+                    p2m := p2m';
+                    wait := false;
+                    rob := retire rob0;
+                    ppc := ppc0 |} p0) |})).
+    unfold upd in *; simpl in *.
+    assert (forall p0,
+         (if decProc c p0
+         then
+          {|
+          hist := Loadh pc0 a0 (mem s a0) delS :: h;
+          getPc := nextPc;
+          state := updSt st0 delS |}
+         else
+          {| hist := hist' (f p0); getPc := pc (f p0); state := st (f p0) |}) =
+    {|
+    hist := hist'
+              (if decProc c p0
+               then
+                {|
+                hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                st := updSt st0 delS;
+                pc := nextPc;
+                p2m := p2m';
+                wait := false;
+                rob := retire rob0;
+                ppc := ppc0 |}
+               else f p0);
+    getPc := pc
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                 st := updSt st0 delS;
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := retire rob0;
+                 ppc := ppc0 |}
+                else f p0);
+    state := st
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Loadh pc0 a0 (mem s a0) delS :: h;
+                 st := updSt st0 delS;
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := retire rob0;
+                 ppc := ppc0 |}
+                else f p0) |}).
+    intros p0.
+    destruct (decProc c p0).
+    rewrite e5 in *; reflexivity.
+    reflexivity.
+    apply (functional_extensionality); intuition.
+    rewrite <- H0 in *; clear H0.
+
+    assumption.
+    intuition.
+
+
+
+    destruct ta.
+    destruct y as [u1 [u2 [u3 [u4 u5]]]].
+    simpl in *.
+    pose proof (Lod p (fun p0 => {| hist := hist' (f p0); getPc := pc (f p0);
+                                       state := st (f p0)|}) (mem s)); simpl in *.
+    rewrite u1, u2, <- u3, u5 in *; simpl in *.
+    rewrite e4 in *.
+    simpl in *.
+    specialize (H _ _ _ e2 e3); simpl in *.
+
+    assert ( (upd
+           (fun p0 : Proc =>
+            {|
+            hist := hist' (f p0);
+            getPc := pc (f p0);
+            state := st (f p0) |}) c
+           {|
+           hist := Loadh pc0 a0 (mem s a0) delS' :: h;
+           getPc := nextPc;
+           state := updSt st0 delS' |}) = (fun p0 : Proc =>
+      {|
+      hist := hist'
+                (upd f c
+                   {|
+                   hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                   st := updSt st0 delS';
+                   pc := nextPc;
+                   p2m := p2m';
+                   wait := false;
+                   rob := empty rob0;
+                   ppc := set ppc0 nextPc |} p0);
+      getPc := pc
+                 (upd f c
+                    {|
+                    hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                    st := updSt st0 delS';
+                    pc := nextPc;
+                    p2m := p2m';
+                    wait := false;
+                    rob := empty rob0;
+                    ppc := set ppc0 nextPc|} p0);
+      state := st
+                 (upd f c
+                    {|
+                    hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                    st := updSt st0 delS';
+                    pc := nextPc;
+                    p2m := p2m';
+                    wait := false;
+                    rob := empty rob0;
+                    ppc := set ppc0 nextPc |} p0) |})).
+    unfold upd in *; simpl in *.
+    assert (forall p0,
+         (if decProc c p0
+         then
+          {|
+          hist := Loadh pc0 a0 (mem s a0) delS' :: h;
+          getPc := nextPc;
+          state := updSt st0 delS' |}
+         else
+          {| hist := hist' (f p0); getPc := pc (f p0); state := st (f p0) |}) =
+    {|
+    hist := hist'
+              (if decProc c p0
+               then
+                {|
+                hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                st := updSt st0 delS';
+                pc := nextPc;
+                p2m := p2m';
+                wait := false;
+                rob := empty rob0;
+                ppc := set ppc0 nextPc |}
+               else f p0);
+    getPc := pc
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                 st := updSt st0 delS';
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := empty rob0;
+                 ppc := set ppc0 nextPc |}
+                else f p0);
+    state := st
+               (if decProc c p0
+                then
+                 {|
+                 hist' := Loadh pc0 a0 (mem s a0) delS' :: h;
+                 st := updSt st0 delS';
+                 pc := nextPc;
+                 p2m := p2m';
+                 wait := false;
+                 rob := empty rob0;
+                 ppc := set ppc0 nextPc |}
+                else f p0) |}).
+    intros p0.
+    destruct (decProc c p0).
+    rewrite e5 in *; reflexivity.
+    reflexivity.
+    apply (functional_extensionality); intuition.
+    rewrite <- H0 in *; clear H0.
+
+    assumption.
+    intuition.
+  Qed.
+
+
+
+
+  Section FinalHist.
+    Variable finalS: FullStream (fun p => spInit, Build_State initData (fun a p => 0)).
+
+  End FinalHist.
+
+  Theorem equal n fa (fs: FullStream fa):
+    exists cp cm (cs: CorrectStream cp cm), forall p,
+      hist' ((fst (getNStateFull fs n)) p) = hist ((fst (getNStateCorrect cs n)) p).
+  Proof.
+    admit.
+  Qed.
 End PerProc.
 
