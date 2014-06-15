@@ -1923,19 +1923,50 @@ Section PerProc.
     intuition.
   Qed.
 
+  CoFixpoint createCorrect s (fs: FullStream s) :=
+    match fs with
+      | FCons _ _ ts fs' =>
+        CCons (buildTrans ts) (createCorrect fs')
+    end.
 
-
-
-  Section FinalHist.
-    Variable finalS: FullStream (fun p => spInit, Build_State initData (fun a p => 0)).
-
-  End FinalHist.
-
-  Theorem equal n fa (fs: FullStream fa):
-    exists cp cm (cs: CorrectStream cp cm), forall p,
-      hist' ((fst (getNStateFull fs n)) p) = hist ((fst (getNStateCorrect cs n)) p).
+  Theorem equal' n:
+    forall r (fs: FullStream r),
+      let (fv, fmv) := getNStateFull fs n in
+      let (cv, cmv) := getNStateCorrect (createCorrect fs) n in
+      mem fmv = cmv /\
+      forall p,
+        hist' (fv p) = hist (cv p) /\ pc (fv p) = getPc (cv p) /\ st (fv p) = state (cv p).
   Proof.
-    admit.
+    induction n.
+    intros.
+    simpl in *.
+    destruct fs.
+    destruct s.
+    repeat (constructor; intros; simpl; intuition).
+
+    simpl.
+    intros.
+    destruct fs.
+    specialize (IHn s' fs).
+    intuition.
+  Qed.
+
+  Theorem equal n:
+    let (fv, fmv) := getNStateFull (createStream 0) n in
+    let (cv, cmv) := getNStateCorrect (createCorrect (createStream 0)) n in
+    forall p,
+      hist' (fv p) = hist (cv p).
+  Proof.
+    pose proof (equal' n (createStream 0)).
+    destruct (getNStateFull (createStream 0) n).
+    destruct (getNStateCorrect (createCorrect (createStream 0)) n).
+    intros.
+    destruct H as [_ stf].
+    specialize (stf p0).
+    intuition.
   Qed.
 End PerProc.
+
+About equal.
+Print Assumptions equal.
 
