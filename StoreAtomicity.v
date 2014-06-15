@@ -13,6 +13,7 @@ Record Resp := { addrR: Addr;
                }.
 
 Section StoreAtomicity.
+  Variable initData: Addr -> Data.
   Variable reqFn: Addr -> Proc -> Index -> Req.
 
   Variable respFn: Time -> option Resp.
