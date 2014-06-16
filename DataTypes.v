@@ -17,5 +17,7 @@ Axiom decData: forall (d1 d2: Data), {d1 = d2} + {d1 <> d2}.
 Parameter Proc: Set.
 Axiom decProc: forall (p1 p2: Proc), {p1 = p2} + {p1 <> p2}.
 
+Parameter initData: Addr -> Data.
+
 Definition Tag := nat.
 Definition decTag := eq_nat_dec.

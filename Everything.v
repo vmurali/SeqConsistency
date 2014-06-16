@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity AlwaysEventually AtomicRegIfc AtomicRegThm AtomicReg.
+Require Import DataTypes StoreAtomicity.
 Require Import List Arith NamedTrans Useful Coq.Logic.FunctionalExtensionality.
 
 Set Implicit Arguments.
