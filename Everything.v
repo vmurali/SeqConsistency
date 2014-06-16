@@ -261,7 +261,17 @@ Section PerProc.
   CoInductive SystemStream: Rest -> Set :=
     | SCons: forall r r', System r r' -> SystemStream r' -> SystemStream r.
 
+  Fixpoint getNStateSpec' n r (ls: SystemStream r) :=
+    match ls with
+      | SCons x _ _ ls' => match n with
+                             | 0 => x
+                             | S m => getNStateSpec' m ls'
+                           end
+    end.
+
   Variable stm: SystemStream initRest.
+
+  Definition getNStateSpec n := getNStateSpec' n stm.
 
   Fixpoint getNState n r (ls: SystemStream r) :=
     match ls with
@@ -270,6 +280,22 @@ Section PerProc.
                              | S m => getNState m ls'
                            end
     end.
+
+  Lemma trivialEq n:
+    forall r (ls: SystemStream r),
+      getNStateSpec' n ls = fst (getNState n ls).
+  Proof.
+    induction n.
+    intros.
+    simpl.
+    destruct ls.
+    reflexivity.
+    intros.
+    simpl.
+    destruct ls.
+    specialize (IHn _ ls).
+    assumption.
+  Qed.
 
   Fixpoint getNSystem' r (ls: SystemStream r) is n:
     System (fst (getNState n ls))
@@ -1361,16 +1387,15 @@ Section PerProc.
   CoInductive FullStream: (Rest * State) -> Set :=
   | FCons: forall s s', FullTrans s s' -> FullStream s' -> FullStream s.
 
-  Require Import JMeq.
-  Program CoFixpoint createStream n:
-    FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
-    FCons (FTrans _ _ (fullEq n)) (createStream (S n)).
-
-  Next Obligation.
+  Lemma nextStEq n:
+    (snd (getNState n stm),
+     NamedTrans.st (getTransNext (lTrans (getTransList getTransNext n)))) =
+    (fst (getNState (S n) stm), getTransSt getTransNext (S n)).
   Proof.
     pose proof (stNEq n stm) as H.
-    simpl in *.
-    rewrite <- H.
+    unfold getTransSt.
+    simpl.
+    rewrite H in *.
     reflexivity.
   Qed.
 
@@ -1382,6 +1407,61 @@ Section PerProc.
           | S m => getNStateFull ls' m
         end
     end.
+
+  CoFixpoint createStream n:
+    FullStream (fst (getNState n stm), getTransSt getTransNext n) :=
+    FCons (FTrans _ _ (fullEq n)) (eq_rect_r _  (createStream (S n)) (nextStEq n)).
+
+  Lemma streamsEq n: forall r (ls: FullStream r) r' (pf: r' = r),
+                       getNStateFull (eq_rect_r FullStream ls pf) n =
+                       getNStateFull ls n.
+  Proof.
+    intros.
+    rewrite pf.
+    destruct ls.
+    reflexivity.
+  Qed.
+
+  Lemma usefulDistributivity n:
+    forall m,
+      getNStateFull (createStream m) n = (fst (getNState (n+m) stm),
+                                          getTransSt getTransNext (n+m)).
+  Proof.
+    induction n.
+    intros m.
+    assert (0+m = m) by omega.
+    rewrite H in *.
+    reflexivity.
+    intros m.
+    specialize (IHn (S m)).
+    assert (n + S m = S n + m) by omega.
+    rewrite <- H.
+    rewrite <- IHn.
+    simpl.
+    apply (streamsEq n (createStream (S m)) (nextStEq m)).
+  Qed.
+
+  Lemma gettingNStateFinally n:
+    getNStateFull (createStream 0) n = (fst (getNState n stm), getTransSt getTransNext n).
+  Proof.
+    pose proof (usefulDistributivity n 0).
+    assert (n+0 = n) by omega.
+    rewrite H0 in *.
+    assumption.
+  Qed.
+
+  Lemma relatingToOriginal n:
+    fst (getNStateFull (createStream 0) n) = getNStateSpec n.
+  Proof.
+    pose proof (gettingNStateFinally n).
+    destruct (getNStateFull (createStream 0) n).
+    injection H; intros.
+    rewrite H1 in *.
+    simpl.
+    destruct (r, s).
+    pose proof (trivialEq n stm).
+    auto.
+  Qed.
 
   Section extension.
     Variable f: Proc -> SpecState.
@@ -1965,8 +2045,21 @@ Section PerProc.
     specialize (stf p0).
     intuition.
   Qed.
+
+  Theorem finalTheorem n:
+    let (cv, cmv) := getNStateCorrect (createCorrect (createStream 0)) n in
+    forall p,
+      hist' (getNStateSpec n p) = hist (cv p).
+  Proof.
+    pose proof (relatingToOriginal n).
+    pose proof (equal n).
+    destruct (getNStateFull (createStream 0) n).
+    simpl in H.
+    rewrite <- H.
+    assumption.
+  Qed.
 End PerProc.
 
-About equal.
-Print Assumptions equal.
+Print Assumptions finalTheorem.
+About finalTheorem.
 
