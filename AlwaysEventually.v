@@ -10,128 +10,47 @@ Section AlwaysEventually.
   Variable P: forall s s', Trans s s' -> Prop.
   Variable P_dec: forall s s' (ts: Trans s s'), {P ts} + {~ P ts}.
 
-  Inductive Eventually: forall s, TransStream s -> Type :=
-  | Later: forall s s' (t: Trans s s') ts, Eventually ts -> Eventually (TCons t ts)
-  | Now: forall s s' (t: Trans s s') ts, P t -> Eventually (TCons t ts).
+  Inductive Eventually: forall s s', TransStream s -> TransStream s' -> Type :=
+  | Later: forall s s1 (t: Trans s s1) ts s' (ts': TransStream s'),
+             ~ P t -> Eventually ts ts' -> Eventually (TCons t ts) ts'
+  | Now: forall s s' (t: Trans s s') ts, P t -> Eventually (TCons t ts) ts.
 
   CoInductive AlwaysEventually: forall s, TransStream s -> Type :=
-  | Final: forall s s' (t: Trans s s') ts, Eventually (TCons t ts) ->
-                                           AlwaysEventually ts ->
-                                           AlwaysEventually (TCons t ts).
+  | Final: forall s (ts: TransStream s) s' (ts': TransStream s'), Eventually ts ts' ->
+                                                                  AlwaysEventually ts' ->
+                                                                  AlwaysEventually ts.
 
-  Fixpoint getFirstTransState s (ts: TransStream s)
-          (es: Eventually ts) (als: AlwaysEventually ts) :=
-    match ts as ts0 in with
-      | TCons s s' t ts' =>
-        if P_dec t
-        then (s, s')
-        else getFirstTransState
-               match es with
-                 | Later _ _ _ _ es' => es'
-                 | Now _ _ _ _ pf => match pf with end
-               end
-               match als with
-                 | Final _ _ _ _ _ als' => als'
-               end
-    end eq_refl.
-
-  Next Obligation.
-    intros.
-    destruct ts as [s1 s2 t1 ts1'].
-    assert (forall s s' s1 s1' (t: Trans s s')  (t1: Trans s1 s1')
-                   (ts': TransStream s') (ts1': TransStream s1'),
-              JMeq t t1 -> JMeq ts' ts1' -> JMeq (TCons t ts') (TCons t1 ts1')).
-    intros.
-    rewrite H0.
-    constructor.
-    intuition.
-    
-    Print JMeq.
-    destruct Heq_ts.
-    injection Heq_ts.
-    clear H.
-    destruct als.
-    injection Heq_ts.
-    assert (TCons t ts' = ts).
-    destruct Heq_ts.
-    reflexivity.
-    intuition.
-    subst.
-    clear Heq_ts H.
-    destruct als.
-    destruct  als.
-    Set Printing All.
-    simpl.
-    destruct es.
-    destruct e.
-    rewrite <- Heq_s in *.
-  Program Fixpoint getFirst s (ts: TransStream s) (es: Eventually ts) (als: AlwaysEventually ts):  :=
-    match ts with
-      | TCons _ _ t ts' =>
-        if P_dec t
-        then ts
-        else getFirst _ _
+  Fixpoint getFirstTransState s (ts: TransStream s) s' (ts': TransStream s')
+          (es: Eventually ts ts'): State * State :=
+    match es with
+      | Now s s' _ _ _ => (s, s')
+      | Later _ _ _ _ _ _ _ es' => getFirstTransState es'
     end.
-           
-  Fixpoint getFirst 
-  Record NextStream :=
-    { ft: A;
-      sn: B;
-      stm: Stream;
-      pf: P ft;
-      alsThing: AlwaysEventually stm
-    }.
 
-  Definition injectionCons1 (x: A) ls' x0 s' (eq: Cons x ls' = Cons x0 s'):
-    x = x0.
-  Proof.
-    injection eq; intros; assumption.
-  Qed.
+  Fixpoint getFirstTrans s (ts: TransStream s) s' (ts': TransStream s')
+          (es: Eventually ts ts'):
+    Trans (fst (getFirstTransState es)) (snd (getFirstTransState es)) :=
+    match es with
+      | Now _ _ t _ _ => t
+      | Later _ _ _ _ _ _ _ es' => getFirstTrans es'
+    end.
 
-  Definition injectionCons2 (x: A) ls' x0 s' (eq: Cons x ls' = Cons x0 s'):
-    ls' = s'.
-  Proof.
-    injection eq; intros; assumption.
-  Qed.
-
-  Fixpoint getFirst f ls (es: Eventually ls) (als: AlwaysEventually ls) {struct es}: NextStream :=
-    match ls as ls0 return ls0 = ls -> NextStream with
-      | Cons x ls' =>
-        fun heq: Cons x ls' = ls =>
-          match P_dec x with
-            | left pp => Build_NextStream (f x pp)
-                           pp
-                           (match als in AlwaysEventually ls0
-                                  return
-                                  Cons x ls' = ls0 -> AlwaysEventually ls' with
-                              | AE_n x0 s' _ als' =>
-                                fun heq => eq_rect_r _ als' (injectionCons2 heq)
-                            end heq)
-            | right pp => getFirst f
-                            (match es in Eventually ls0
-                                   return Cons x ls' = ls0 -> Eventually ls' with
-                               | Event_e x0 s' es' =>
-                                 fun heq: Cons x ls' = Cons x0 s' =>
-                                   eq_rect_r _ es' (injectionCons2 heq)
-                               | Event_n x0 s' pf' =>
-                                 fun heq =>
-                                   match pp (eq_rect_r _ pf' (injectionCons1 heq)) with end
-                             end heq)
-                            (match als in AlwaysEventually ls0
-                                   return Cons x ls' = ls0 -> AlwaysEventually ls' with
-                               | AE_n x0 s' _ als' =>
-                                 fun heq =>
-                                   eq_rect_r _ als' (injectionCons2 heq)
-                             end heq)
-          end
-    end eq_refl.
-
-  Fixpoint getN f ls (als: AlwaysEventually ls) n :=
+  Fixpoint getNState s (ts: TransStream s) (als: AlwaysEventually ts) (n: nat): State * State :=
     match als with
-      | AE_n x s' es als' =>
+      | Final _ _ _ _ es als' =>
         match n with
-          | 0 => sn (getFirst f es (AE_n es als'))
-          | S m => getN f (alsThing (getFirst f es (AE_n es als'))) m
+          | 0 => getFirstTransState es
+          | S m => getNState als' m
+        end
+    end.
+
+  Fixpoint getNTrans s (ts: TransStream s) (als: AlwaysEventually ts) (n: nat):
+    Trans (fst (getNState als n)) (snd (getNState als n)):=
+    match als with
+      | Final _ _ _ _ es als' =>
+        match n with
+          | 0 => getFirstTrans es
+          | S m => getNTrans als' m
         end
     end.
 End AlwaysEventually.
