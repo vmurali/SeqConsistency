@@ -19,19 +19,46 @@ Section AlwaysEventually.
                                            AlwaysEventually ts ->
                                            AlwaysEventually (TCons t ts).
 
-  Require JMeq.
-
-  Program Fixpoint getFirstTransState s (ts: TransStream s)
+  Fixpoint getFirstTransState s (ts: TransStream s)
           (es: Eventually ts) (als: AlwaysEventually ts) :=
-    match ts with
+    match ts as ts0 in with
       | TCons s s' t ts' =>
         if P_dec t
         then (s, s')
-        else @getFirstTransState s' ts' _ _
-    end.
+        else getFirstTransState
+               match es with
+                 | Later _ _ _ _ es' => es'
+                 | Now _ _ _ _ pf => match pf with end
+               end
+               match als with
+                 | Final _ _ _ _ _ als' => als'
+               end
+    end eq_refl.
 
   Next Obligation.
     intros.
+    destruct ts as [s1 s2 t1 ts1'].
+    assert (forall s s' s1 s1' (t: Trans s s')  (t1: Trans s1 s1')
+                   (ts': TransStream s') (ts1': TransStream s1'),
+              JMeq t t1 -> JMeq ts' ts1' -> JMeq (TCons t ts') (TCons t1 ts1')).
+    intros.
+    rewrite H0.
+    constructor.
+    intuition.
+    
+    Print JMeq.
+    destruct Heq_ts.
+    injection Heq_ts.
+    clear H.
+    destruct als.
+    injection Heq_ts.
+    assert (TCons t ts' = ts).
+    destruct Heq_ts.
+    reflexivity.
+    intuition.
+    subst.
+    clear Heq_ts H.
+    destruct als.
     destruct  als.
     Set Printing All.
     simpl.
