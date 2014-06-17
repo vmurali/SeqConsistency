@@ -1,31 +1,52 @@
 Set Implicit Arguments.
 
 Section AlwaysEventually.
-  Variable A B: Type.
+  Variable State: Set.
+  Variable Trans: State -> State -> Set.
 
-  CoInductive Stream: Type :=
-  | Cons: forall x: A, Stream -> Stream.
+  CoInductive TransStream: State -> Set :=
+  | TCons: forall s s' (t: Trans s s'), TransStream s' -> TransStream s.
 
-  Definition hdStream s :=
-    match s with
-      | Cons x _ => x
+  Variable P: forall s s', Trans s s' -> Prop.
+  Variable P_dec: forall s s' (ts: Trans s s'), {P ts} + {~ P ts}.
+
+  Inductive Eventually: forall s, TransStream s -> Type :=
+  | Later: forall s s' (t: Trans s s') ts, Eventually ts -> Eventually (TCons t ts)
+  | Now: forall s s' (t: Trans s s') ts, P t -> Eventually (TCons t ts).
+
+  CoInductive AlwaysEventually: forall s, TransStream s -> Type :=
+  | Final: forall s s' (t: Trans s s') ts, Eventually (TCons t ts) ->
+                                           AlwaysEventually ts ->
+                                           AlwaysEventually (TCons t ts).
+
+  Require JMeq.
+
+  Program Fixpoint getFirstTransState s (ts: TransStream s)
+          (es: Eventually ts) (als: AlwaysEventually ts) :=
+    match ts with
+      | TCons s s' t ts' =>
+        if P_dec t
+        then (s, s')
+        else @getFirstTransState s' ts' _ _
     end.
 
-  Definition tlStream s :=
-    match s with
-      | Cons _ xs => xs
+  Next Obligation.
+    intros.
+    destruct  als.
+    Set Printing All.
+    simpl.
+    destruct es.
+    destruct e.
+    rewrite <- Heq_s in *.
+  Program Fixpoint getFirst s (ts: TransStream s) (es: Eventually ts) (als: AlwaysEventually ts):  :=
+    match ts with
+      | TCons _ _ t ts' =>
+        if P_dec t
+        then ts
+        else getFirst _ _
     end.
-
-  Variable P: A -> Prop.
-  Variable P_dec: forall x, {P x} + {~ P x}.
-  Inductive Eventually: Stream -> Type :=
-  | Event_e: forall x s, Eventually s -> Eventually (Cons x s)
-  | Event_n: forall x s, P x -> Eventually (Cons x s).
-
-  CoInductive AlwaysEventually: Stream -> Type :=
-  | AE_n: forall x s, Eventually (Cons x s) -> AlwaysEventually s ->
-                      AlwaysEventually (Cons x s).
-
+           
+  Fixpoint getFirst 
   Record NextStream :=
     { ft: A;
       sn: B;
