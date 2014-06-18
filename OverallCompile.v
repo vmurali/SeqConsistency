@@ -87,6 +87,18 @@ Section SimulateTransitions.
     specialize (IHn _ sas).
     assumption.
   Qed.
+
+  Theorem streamTransSimulateEx:
+    forall sa (sas: Stream TransA sa),
+      exists (sbs: Stream TransB (getBFromA sa)),
+        forall n,
+          getBFromA(fst (getStreamState n sas)) = fst (getStreamState n sbs).
+  Proof.
+    intros.
+    exists (createStreamB sas).
+    intros.
+    apply (streamTransSimulate n sas).
+  Qed.
 End SimulateTransitions.
 
 (* Definition of a transition or a stream of transitions being simulated by other
@@ -124,12 +136,24 @@ Section ParallelCompose.
     | ABTrans sa1 sa2 (ta: TransA sa1 sa2) sb1 sb2 (tb: TransB sb1 sb2):
         getTransAIo ta = getTransBIo tb -> TransAB (sa1, sb1) (sa2, sb2).
 
+  Definition getStreamATrans x (sab: Stream TransAB x) n:
+    TransA (fst (fst (getStreamState n sab))) (fst (snd (getStreamState n sab))) :=
+    match getStreamTransition n sab in TransAB x y return TransA (fst x) (fst y) with
+      | ABTrans _ _ ta _ _ _ _ => ta
+    end.
+
+  Definition getStreamBTrans x (sab: Stream TransAB x) n:
+    TransB (snd (fst (getStreamState n sab))) (snd (snd (getStreamState n sab))) :=
+    match getStreamTransition n sab in TransAB x y return TransB (snd x) (snd y) with
+      | ABTrans _ _ _ _ _ ta _ => ta
+    end.
+
   Definition getStreamEq x (sab: Stream TransAB x) n :=
     match getStreamTransition n sab as t0 return match t0 with
                                                    | ABTrans _ _ ta _ _ tb _ =>
                                                      getTransAIo ta = getTransBIo tb
                                                  end with
-      | ABTrans _ _ _ _ _ _ eq => eq
+      | ABTrans _ _ _ _ _ _ me => me
     end.
 
   CoFixpoint getStreamA x (sab: Stream TransAB x): Stream TransA (fst x) :=
@@ -149,6 +173,55 @@ Section ParallelCompose.
             fun sab' => TCons _ tb (getStreamB sab')
         end sab'
     end.
+
+  Lemma streamTa n: forall x (sab: Stream TransAB x),
+    getStreamIo getTransAIo n (getStreamA sab) = getTransAIo (getStreamATrans sab n).
+  Proof.
+    induction n.
+    intros.
+    destruct sab.
+    unfold getStreamIo, getStreamATrans.
+    simpl.
+    destruct t.
+    reflexivity.
+    intros.
+    destruct sab.
+    unfold getStreamIo, getStreamATrans.
+    simpl.
+    destruct t.
+    specialize (IHn _ sab).
+    assumption.
+  Qed.
+
+  Lemma streamTb n: forall x (sab: Stream TransAB x),
+    getStreamIo getTransBIo n (getStreamB sab) = getTransBIo (getStreamBTrans sab n).
+  Proof.
+    induction n.
+    intros.
+    destruct sab.
+    unfold getStreamIo, getStreamBTrans.
+    simpl.
+    destruct t.
+    reflexivity.
+    intros.
+    destruct sab.
+    unfold getStreamIo, getStreamBTrans.
+    simpl.
+    destruct t.
+    specialize (IHn _ sab).
+    assumption.
+  Qed.
+
+  Theorem streamIoEq x (sab: Stream TransAB x) n:
+    getStreamIo getTransAIo n (getStreamA sab) = getStreamIo getTransBIo n (getStreamB sab).
+  Proof.
+    pose proof (streamTa n sab).
+    pose proof (streamTb n sab).
+    rewrite H, H0. clear H H0.
+    unfold getStreamATrans, getStreamBTrans.
+    destruct (getStreamTransition n sab).
+    intuition.
+  Qed.
 
   Section BuildTransAB.
     Variable a: StateA.
@@ -211,6 +284,8 @@ Section ComplexSimulate.
   Variable getA2FromA1: StateA1 -> StateA2.
   Variable getB2FromB1: StateB1 -> StateB2.
 
+  Definition getA2B2FromA1B2 (x: StateA1 * StateB2) := (getA2FromA1 (fst x), (snd x)).
+
   Definition TransA1B1 := TransAB getTransA1Io getTransB1Io.
   Definition TransA1B2 := TransAB getTransA1Io getTransB2Io.
   Definition TransA2B2 := TransAB getTransA2Io getTransB2Io.
@@ -219,8 +294,9 @@ Section ComplexSimulate.
    * (A1+B1) transition can be converted to (A2+B2) where states match *)
   Section StatesMatch.
     Variable convertA1B2ToA2B2:
-      (forall a1 b2 a1' b2', TransA1B2 (a1, b2) (a1', b2') ->
-                             TransA2B2 (getA2FromA1 a1, b2) (getA2FromA1 a1', b2')).
+      (forall a1b2 a1b2', TransA1B2 (a1b2) (a1b2') ->
+                             TransA2B2 (getA2B2FromA1B2 a1b2)
+                                       (getA2B2FromA1B2 a1b2')).
     Variable convertB1ToB2:
       (forall b1 (sb1: Stream TransB1 b1),
        exists b2 (sb2: Stream TransB2 b2),
@@ -233,11 +309,28 @@ Section ComplexSimulate.
                     fst (fst (getStreamState n sa2b2)).
     Proof.
       intros.
-      pose proof (getStreamA sa1b1) as sa1.
-      pose proof (getStreamB sa1b1) as sb1.
+      pose (getStreamA sa1b1) as sa1.
+      pose (getStreamB sa1b1) as sb1.
       simpl in *.
       destruct (convertB1ToB2 sb1) as [b2 [sb2 ioMatch]].
-      About buildTransAB.
+      pose proof (streamIoEq sa1b1) as Y.
+      fold sa1 in Y.
+      fold sb1 in Y.
+      assert (H: forall n,
+                   getStreamIo getTransA1Io n sa1 = getStreamIo getTransB2Io n sb2).
+      intros.
+      specialize (ioMatch n).
+      specialize (Y n).
+      rewrite <- ioMatch.
+      assumption.
+
+      pose proof (buildTransAB _ _ _ _ H 0) as B.
+      generalize B convertA1B2ToA2B2; clear; intros.
+
+      pose proof (streamTransSimulateEx _ getA2B2FromA1B2 convertA1B2ToA2B2 B) as [sbs reset].
+      rewrite H.
+      subst.
+      omega.
       pose proof (buildTransAB getTransA1Io getTransB2Io sa1 sb2 ioMatch).
       
       
