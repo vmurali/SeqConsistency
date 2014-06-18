@@ -124,6 +124,14 @@ Section ParallelCompose.
     | ABTrans sa1 sa2 (ta: TransA sa1 sa2) sb1 sb2 (tb: TransB sb1 sb2):
         getTransAIo ta = getTransBIo tb -> TransAB (sa1, sb1) (sa2, sb2).
 
+  Definition getStreamEq x (sab: Stream TransAB x) n :=
+    match getStreamTransition n sab as t0 return match t0 with
+                                                   | ABTrans _ _ ta _ _ tb _ =>
+                                                     getTransAIo ta = getTransBIo tb
+                                                 end with
+      | ABTrans _ _ _ _ _ _ eq => eq
+    end.
+
   CoFixpoint getStreamA x (sab: Stream TransAB x): Stream TransA (fst x) :=
     match sab with
       | TCons _ _ t sab' =>
@@ -141,24 +149,6 @@ Section ParallelCompose.
             fun sab' => TCons _ tb (getStreamB sab')
         end sab'
     end.
-
-  Fixpoint getStreamEq x (sab: Stream TransAB x) n:
-    getTransAIo (getStreamTransition n (getStreamA sab)) =
-    getTransBIo (getStreamTransition n (getStreamB sab)) :=
-    match sab with
-      | TCons _ _ (ABTrans _ _ ta _ _ tb eq) sab' =>
-        match n as n0 return  with
-          | 0 => eq
-          | S m => fun _ _ => getStreamEq sab'
-        end ta tb
-    end.
-        match t with
-          | ABTrans _ _ ta _ _ tb _ =>
-            
-            fun sab' => TCons _ ta (getStreamA sab')
-        end sab'
-    end.
-
 
   Section BuildTransAB.
     Variable a: StateA.
