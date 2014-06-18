@@ -437,7 +437,7 @@ Section ComplexSimulate.
    * Given: A1 can be converted to A2 and
    *        For each converted transition, the state change that happens in B2 matches
    *)
-  Section ProvingStatesMatch.
+  Section ProvingStatesMatch1.
     Variable convertA1ToA2:
       (forall a1 a1', TransA1 a1 a1' ->
                       TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
@@ -476,5 +476,21 @@ Section ComplexSimulate.
       subst.
       apply (ABTrans getTransA2Io getTransB2Io _ _ _ _ _ _ pf).
     Qed.
-  End ProvingStatesMatch.
+
+    Variable convertB1ToB2:
+      (forall b1 (sb1: Stream TransB1 b1),
+       exists b2 (sb2: Stream TransB2 b2),
+         forall n, getStreamIo getTransB1Io n sb1 = getStreamIo getTransB2Io n sb2).
+
+    Theorem statesMatchBigCond:
+      forall a1 b1 (sa1b1: Stream TransA1B1 (a1,b1)),
+        exists a2 b2 (sa2b2: Stream TransA2B2 (a2,b2)),
+          forall n, getA2FromA1 (fst (fst (getStreamState n sa1b1))) =
+                    fst (fst (getStreamState n sa2b2)).
+    Proof.
+      intros.
+      apply (statesMatch canConvert convertB1ToB2 sa1b1).
+    Qed.
+    
+  End ProvingStatesMatch2.
 End ComplexSimulate.
