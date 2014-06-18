@@ -361,6 +361,12 @@ Section ComplexSimulate.
   Definition TransA1B2 := TransAB getTransA1Io getTransB2Io.
   Definition TransA2B2 := TransAB getTransA2Io getTransB2Io.
 
+  Record TransB2Rec :=
+    { b2: StateB2;
+      b2': StateB2;
+      tb2: TransB2 b2 b2'
+    }. 
+
   (* (A1+B2) transition can be converted to (A2+B2), B2 stream-io-simulates B1 ->
    * (A1+B1) transition can be converted to (A2+B2) where states match *)
   Section StatesMatch.
@@ -443,18 +449,79 @@ Section ComplexSimulate.
                       TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
 
     Variable bigCondition:
+      forall a1 a1' (ta1: TransA1 a1 a1')
+             b21 b21' (tb1: TransB2 b21 b21')
+             (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1),
+        {rec | getTransA2Io (convertA1ToA2 ta1) = getTransB2Io (tb2 rec) /\ b21 = b2 rec /\ b21' = b2' rec}.
+
+    Theorem canConvert:
+      forall x x', TransA1B2 x x' ->
+                   TransA2B2 (getA2FromA1 (fst x), snd x) (getA2FromA1 (fst x'), snd x').
+    Proof.
+      intros.
+      destruct H.
+      simpl.
+      pose proof (bigCondition e) as [tbnew [pf [u2 u3]]].
+      subst.
+      apply (ABTrans getTransA2Io getTransB2Io _ _ _ _ _ _ pf).
+    Qed.
+
+    Variable convertB1ToB2:
+      (forall b1 (sb1: Stream TransB1 b1),
+       exists b2 (sb2: Stream TransB2 b2),
+         forall n, getStreamIo getTransB1Io n sb1 = getStreamIo getTransB2Io n sb2).
+
+    Theorem statesMatchBigCond:
+      forall a1 b1 (sa1b1: Stream TransA1B1 (a1,b1)),
+        exists a2 b2 (sa2b2: Stream TransA2B2 (a2,b2)),
+          forall n, getA2FromA1 (fst (fst (getStreamState n sa1b1))) =
+                    fst (fst (getStreamState n sa2b2)).
+    Proof.
+      intros.
+      apply (statesMatch canConvert convertB1ToB2 sa1b1).
+    Qed.
+    
+  End ProvingStatesMatch1.
+
+  (*
+   * For each converted transition from A1 to A2 (in the presence of B2),
+   * if either IO matches between A1 and A2 or
+   *           there exists a transition in B2 corresponding to IO of A2's transition
+   * then for each converted transition, the state change that happens in B2 matches
+   *)
+  Section ProvingStatesMatch2.
+    Variable convertA1ToA2:
+      (forall a1 a1', TransA1 a1 a1' ->
+                      TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
+
+    Variable bigCond2:
+      forall a1 a1' (ta1: TransA1 a1 a1')
+             b2 b2' (tb: TransB2 b2 b2'),
+        getTransA1Io ta1 = getTransB2Io tb ->
+        getTransA1Io ta1 <> getTransA2Io (convertA1ToA2 ta1) ->
+        {rec: TransB2Rec | getTransA2Io (convertA1ToA2 ta1) = getTransB2Io (tb2 rec)}.
+
+    Theorem bigCondition:
+      forall a1 a1' (ta1: TransA1 a1 a1')
+             b21 b21' b22 b22' (tb1: TransB2 b21 b21') (tb2: TransB2 b22 b22')
+             (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1)
+             (a2b2EqIo: getTransA2Io (convertA1ToA2 ta1) = getTransB2Io tb2),
+        b21 = b22 /\ b21' = b22'.
+    Proof.
+      intros.
+      specialize (bigCond2 a1b2EqIo).
+
+
+    Theorem bigCondition:
       forall a1 a1' (ta1: TransA1 a1 a1') (ta2: TransA2 (getA2FromA1 a1) (getA2FromA1 a1'))
              b21 b21' b22 b22' (tb1: TransB2 b21 b21') (tb2: TransB2 b22 b22')
              (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1)
              (a2b2EqIo: getTransA2Io ta2 = getTransB2Io tb2)
              (convTa1Ta2: convertA1ToA2 ta1 = ta2),
         b21 = b22 /\ b21' = b22'.
-
-    Record TransB2Rec :=
-      { b2: StateB2;
-        b2': StateB2;
-        tb2: TransB2 b2 b2'
-      }. 
+    Proof.
+      intros.
+      specialize (bigCond2 a1b2EqIo).
 
     Variable existsB2IoForA2:
       forall a2 a2' (ta2: TransA2 a2 a2'),
@@ -492,5 +559,6 @@ Section ComplexSimulate.
       apply (statesMatch canConvert convertB1ToB2 sa1b1).
     Qed.
     
-  End ProvingStatesMatch2.
+  End ProvingStatesMatch1.
+
 End ComplexSimulate.
