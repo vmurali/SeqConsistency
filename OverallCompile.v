@@ -213,6 +213,26 @@ Section ParallelCompose.
     assumption.
   Qed.
 
+  Theorem streamStateEq n: forall x (sab: Stream TransAB x),
+    getStreamState n sab = ((fst (getStreamState n (getStreamA sab)), 
+                             fst (getStreamState n (getStreamB sab))),
+                            (snd (getStreamState n (getStreamA sab)),
+                             snd (getStreamState n (getStreamB sab)))).
+  Proof.
+    induction n.
+    intros.
+    destruct sab.
+    simpl.
+    destruct t.
+    reflexivity.
+    intros.
+    destruct sab.
+    simpl.
+    destruct t.
+    apply (IHn _ sab).
+  Qed.
+
+
   Theorem streamIoEq x (sab: Stream TransAB x) n:
     getStreamIo getTransAIo n (getStreamA sab) = getStreamIo getTransBIo n (getStreamB sab).
   Proof.
@@ -231,16 +251,68 @@ Section ParallelCompose.
     Variable sb: Stream TransB b.
     Variable ioMatch: forall n, getStreamIo getTransAIo n sa = getStreamIo getTransBIo n sb.
 
-    CoFixpoint buildTransAB n:
-      Stream TransAB (fst (getStreamState n sa), fst (getStreamState n sb)).
+    Lemma nextIoMatch n:
+      (snd (getStreamState n sa), snd (getStreamState n sb)) =
+      (fst (getStreamState (S n) sa), fst (getStreamState (S n) sb)).
     Proof.
-      pose proof (TCons _ (ABTrans (ioMatch n))) as tcons.
-      pose proof (stateNSndStateSnFst n sa) as sarew.
-      pose proof (stateNSndStateSnFst n sb) as sbrew.
-      specialize (buildTransAB (S n)).
-      rewrite <- sarew, <- sbrew in buildTransAB.
-      apply (tcons buildTransAB).
-    Defined.
+      pose proof (stateNSndStateSnFst n sa).
+      pose proof (stateNSndStateSnFst n sb).
+      rewrite H, H0.
+      reflexivity.
+    Qed.
+
+    CoFixpoint buildTransAB n:
+      Stream TransAB (fst (getStreamState n sa), fst (getStreamState n sb)) :=
+      TCons _ (ABTrans (ioMatch n)) (eq_rect_r _ (buildTransAB (S n)) (nextIoMatch n)).
+
+    Lemma abStateEq n: forall r (ls: Stream TransAB r) r' (pf: r' = r),
+                         getStreamState n (eq_rect_r _ ls pf) = getStreamState n ls.
+    Proof.
+      intros.
+      rewrite pf.
+      destruct ls.
+      reflexivity.
+    Qed.
+
+    Lemma buildTransDistr n:
+      forall m,
+        fst (getStreamState n (buildTransAB m)) =
+        (fst (getStreamState (n+m) sa), fst (getStreamState (n+m) sb)).
+    Proof.
+      induction n.
+      intros m.
+      assert (0+m = m) by omega.
+      rewrite H.
+      reflexivity.
+      intros m.
+      assert (S n + m = n + S m) by omega.
+      specialize (IHn (S m)).
+      rewrite H.
+      rewrite <- IHn.
+      simpl.
+      f_equal.
+      apply (abStateEq n (buildTransAB (S m)) (nextIoMatch m)).
+    Qed.
+
+    Lemma getStateFinally n:
+      fst (getStreamState n (buildTransAB 0)) = (fst (getStreamState n sa),
+                                                 fst (getStreamState n sb)).
+    Proof.
+      pose proof (buildTransDistr n 0).
+      assert (n+0 = n) by omega.
+      rewrite H0 in *.
+      assumption.
+    Qed.
+
+    Lemma getStateABGetStateA n:
+      fst (fst (getStreamState n (buildTransAB 0))) = fst (getStreamState n sa).
+    Proof.
+      pose proof (getStateFinally n).
+      destruct (fst (getStreamState n (buildTransAB 0))).
+      injection H; intros.
+      intuition.
+    Qed.
+
   End BuildTransAB.
 End ParallelCompose.
 
@@ -285,8 +357,6 @@ Section ComplexSimulate.
   Variable getA2FromA1: StateA1 -> StateA2.
   Variable getB2FromB1: StateB1 -> StateB2.
 
-  Definition getA2B2FromA1B2 (x: StateA1 * StateB2) := (getA2FromA1 (fst x), (snd x)).
-
   Definition TransA1B1 := TransAB getTransA1Io getTransB1Io.
   Definition TransA1B2 := TransAB getTransA1Io getTransB2Io.
   Definition TransA2B2 := TransAB getTransA2Io getTransB2Io.
@@ -296,8 +366,8 @@ Section ComplexSimulate.
   Section StatesMatch.
     Variable convertA1B2ToA2B2:
       (forall a1b2 a1b2', TransA1B2 (a1b2) (a1b2') ->
-                             TransA2B2 (getA2B2FromA1B2 a1b2)
-                                       (getA2B2FromA1B2 a1b2')).
+                             TransA2B2 ((fun x => (getA2FromA1 (fst x), (snd x))) a1b2)
+                                       ((fun x => (getA2FromA1 (fst x), (snd x))) a1b2')).
     Variable convertB1ToB2:
       (forall b1 (sb1: Stream TransB1 b1),
        exists b2 (sb2: Stream TransB2 b2),
@@ -325,24 +395,43 @@ Section ComplexSimulate.
       rewrite <- ioMatch.
       assumption.
 
-      pose proof (buildTransAB _ _ _ _ H 0) as B.
-      generalize B convertA1B2ToA2B2; clear; intros.
+      pose (buildTransAB _ _ _ _ H 0) as B.
 
-      pose proof (streamTransSimulateEx _ getA2B2FromA1B2 convertA1B2ToA2B2 B) as [sbs reset].
-      exists (fst (getA2B2FromA1B2
+      pose proof (streamTransSimulateEx _ (fun x => (getA2FromA1 (fst x), (snd x)))
+                                        convertA1B2ToA2B2 B) as [sbs reset].
+      exists (fst ((fun x => (getA2FromA1 (fst x), (snd x)))
                      (fst (getStreamState 0 sa1), fst (getStreamState 0 sb2)))).
-      exists (snd (getA2B2FromA1B2
+      exists (snd ((fun x => (getA2FromA1 (fst x), (snd x)))
                      (fst (getStreamState 0 sa1), fst (getStreamState 0 sb2)))).
       exists sbs.
-      unfold getA2B2FromA1B2 in reset.
       intros n.
       specialize (reset n).
-
+      pose proof (getStateABGetStateA getTransA1Io getTransB2Io sa1 sb2 H n) as u1.
+      fold B in u1.
+      assert (u2: fst (getStreamState n sbs) = (fst (fst (getStreamState n sbs)),
+                                                snd (fst (getStreamState n sbs)))).
+      destruct (fst (getStreamState n sbs)).
+      reflexivity.
+      rewrite u2 in reset.
+      injection reset; intros u3 u4.
+      clear u2 reset.
+      pose proof (streamStateEq n sa1b1) as stmEq.
+      fold sa1 in stmEq.
+      fold sb1 in stmEq.
+      assert (u5: fst (fst (getStreamState n sa1b1)) =
+                  fst (fst (fst (getStreamState n sa1), fst (getStreamState n sb1),
+          (snd (getStreamState n sa1), snd (getStreamState n sb1))))).
+      f_equal; f_equal; assumption.
+      simpl in u5.
+      rewrite u5.
+      assert (u6: getA2FromA1 (fst (fst (getStreamState n B))) =
+                  getA2FromA1 (fst (getStreamState n sa1))).
+      f_equal; assumption.
+      rewrite <- u6.
+      assumption.
+    Qed.      
   End StatesMatch.
-    intros.
-    True.
-    forall a1 b2 a2 b2,
-      a
+
   Theorem complexSimulate:
     TransitionArchSimulate getTransA1Arch getTransA2Arch ->
     StreamIoSimulate getTransB1Io getTransB2Io ->
