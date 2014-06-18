@@ -1,3 +1,4 @@
+Require Import Omega.
 Set Implicit Arguments.
 
 (* Defining transitions and streams associated with transitions 
@@ -239,7 +240,7 @@ Section ParallelCompose.
       specialize (buildTransAB (S n)).
       rewrite <- sarew, <- sbrew in buildTransAB.
       apply (tcons buildTransAB).
-    Qed.
+    Defined.
   End BuildTransAB.
 End ParallelCompose.
 
@@ -328,18 +329,15 @@ Section ComplexSimulate.
       generalize B convertA1B2ToA2B2; clear; intros.
 
       pose proof (streamTransSimulateEx _ getA2B2FromA1B2 convertA1B2ToA2B2 B) as [sbs reset].
-      rewrite H.
-      subst.
-      omega.
-      pose proof (buildTransAB getTransA1Io getTransB2Io sa1 sb2 ioMatch).
-      
-      
-        TransA2B2 (getA2FromA1 a, getB2FromB1 b)
-                  (getA2FromA1 a', getB2FromB1 b').
-    Proof.
-      intros.
-      destruct ta.
-  Proof.
+      exists (fst (getA2B2FromA1B2
+                     (fst (getStreamState 0 sa1), fst (getStreamState 0 sb2)))).
+      exists (snd (getA2B2FromA1B2
+                     (fst (getStreamState 0 sa1), fst (getStreamState 0 sb2)))).
+      exists sbs.
+      unfold getA2B2FromA1B2 in reset.
+      intros n.
+      specialize (reset n).
+
   End StatesMatch.
     intros.
     True.
