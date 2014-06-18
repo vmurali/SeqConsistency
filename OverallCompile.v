@@ -521,7 +521,7 @@ Section ComplexSimulate.
       apply (exist _ sth); intuition.
       apply (@bigCond2 n).
     Qed.
-      
+
     Variable convertB1ToB2:
       (forall b1 (sb1: Stream TransB1 b1),
        exists b2 (sb2: Stream TransB2 b2),
