@@ -432,13 +432,49 @@ Section ComplexSimulate.
     Qed.      
   End StatesMatch.
 
-  Theorem complexSimulate:
-    TransitionArchSimulate getTransA1Arch getTransA2Arch ->
-    StreamIoSimulate getTransB1Io getTransB2Io ->
-    StreamArchSimulate
-      (@getTransABArchA _ _ _ _ _ _ getTransA1Io getTransB1Io getTransA1Arch)
-      (@getTransABArchA _ _ _ _ _ _ getTransA2Io getTransB2Io getTransA2Arch).
-  Proof.
-    admit.
-  Qed.
+  (*
+   * To Prove: (A1+B2) transition can be converted to (A2+B2)
+   * Given: A1 can be converted to A2 and
+   *        For each converted transition, the state change that happens in B2 matches
+   *)
+  Section ProvingStatesMatch.
+    Variable convertA1ToA2:
+      (forall a1 a1', TransA1 a1 a1' ->
+                      TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
+
+    Variable bigCondition:
+      forall a1 a1' (ta1: TransA1 a1 a1') (ta2: TransA2 (getA2FromA1 a1) (getA2FromA1 a1'))
+             b21 b21' b22 b22' (tb1: TransB2 b21 b21') (tb2: TransB2 b22 b22')
+             (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1)
+             (a2b2EqIo: getTransA2Io ta2 = getTransB2Io tb2)
+             (convTa1Ta2: convertA1ToA2 ta1 = ta2),
+        b21 = b22 /\ b21' = b22'.
+
+    Record TransB2Rec :=
+      { b2: StateB2;
+        b2': StateB2;
+        tb2: TransB2 b2 b2'
+      }. 
+
+    Variable existsB2IoForA2:
+      forall a2 a2' (ta2: TransA2 a2 a2'),
+        {rec |
+         getTransA2Io ta2 = getTransB2Io (tb2 rec)}.
+
+    Theorem canConvert:
+      forall x x', TransA1B2 x x' ->
+                   TransA2B2 (getA2FromA1 (fst x), snd x) (getA2FromA1 (fst x'), snd x').
+    Proof.
+      intros.
+      destruct H.
+      simpl.
+      pose (@convertA1ToA2 _ _ ta) as ta2.
+      pose proof (@existsB2IoForA2 _ _ ta2) as [[b2 b2' txb2] pf].
+      simpl in *.
+      assert (u1: convertA1ToA2 ta = ta2) by intuition.
+      pose proof (@bigCondition _ _ _ _ _ _ _ _ _ _ e pf u1) as [u2 u3].
+      subst.
+      apply (ABTrans getTransA2Io getTransB2Io _ _ _ _ _ _ pf).
+    Qed.
+  End ProvingStatesMatch.
 End ComplexSimulate.
