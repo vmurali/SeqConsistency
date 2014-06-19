@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity Case NamedTrans Useful AtomicRegIfc.
+Require Import DataTypes StoreAtomicity NamedTrans Useful AtomicRegIfc.
 
 Set Implicit Arguments.
 
@@ -255,7 +255,6 @@ Section ForAddr.
     unfold latestAtomValue.
     destruct now as [noPrevNonSt | [prevNonSt | st]].
 
-    Case "noPrevNonSt".
     unfold atomNoPrevNonSt in *.
     left.
     constructor.
@@ -265,7 +264,6 @@ Section ForAddr.
     assert (opts: 0 <= t' < t \/ t' = t) by omega.
     destruct opts as [done | eq]; [| rewrite eq]; intuition.
 
-    Case "prevNonSt".
     right.
     unfold atomPrevNonSt in *.
     destruct prevNonSt as [[tm [cond lm]] noCurr].
@@ -286,7 +284,6 @@ Section ForAddr.
     rewrite ez2 in *; intuition.
     intuition.
 
-    Case "st".
     right.
     unfold atomSt in st.
     exists t.
@@ -299,10 +296,8 @@ Section ForAddr.
   Proof.
     induction t.
 
-    Case "0".
     left; constructor; [| intros t' contra; assert False by omega]; intuition.
 
-    Case "S t".
     apply latestAtomInd.
 
     unfold atomNoPrevNonSt.
@@ -329,30 +324,24 @@ Section ForAddr.
     destruct (trans (getTransNext (lTrans (getTransList getTransNext t))));
       simpl in *.
 
-    SCase "AReq".
     destruct (decAddr a a0).
     rewrite <- e in *; clear e.
 
-    SSCase "a = a0".
     case_eq (reqFn a c (next (lSt (getTransList getTransNext t)) a c)); simpl;
     intros desc dataQ reqF.
     destruct desc.
 
-    SSSCase "Ld".
     simpl in *.
     destruct IHt.
 
-    SSSSCase "NoPrev".
     left.
     intuition.
     discriminate.
 
-    SSSSCase "Prev".
     right; left.
     intuition.
     discriminate.
 
-    SSSCase "St".
     right; right.
     destruct (decAddr a a).
     constructor. intuition.
@@ -388,7 +377,6 @@ Section ForAddr.
     intuition.
     intuition.
 
-    SSCase "Idle".
     destruct IHt; intuition.
   Qed.
 
@@ -593,11 +581,9 @@ Section ForAddr.
 
       destruct atom1 as [no1|yes1]; destruct atom2 as [no2|yes2].
 
-      Case "noBefore1, noBefore 2".
       destruct no1 as [u1 _]; destruct no2 as [u2 _].
       rewrite <- u1 in u2; assumption.
 
-      Case "noBefore1, before 2".
       destruct yes2 as [tm [tm_lt_t stMatch]].
       unfold lastMatchAtomStore in stMatch.
       specialize (prevEq tm_lt_t).
@@ -621,7 +607,6 @@ Section ForAddr.
 
       intros respmEq; rewrite respmEq in *; simpl in *; intuition.
 
-      Case "before1, noBefore 2".
       destruct yes1 as [tm [tm_lt_t' stMatch]].
       specialize (prevEq tm_lt_t').
       assert (tm_lt_t: 0 <= tm < t) by omega.
@@ -641,7 +626,6 @@ Section ForAddr.
 
       intros respmEq; rewrite respmEq in *; simpl in *; intuition.
       
-      Case "before1, before 2".
       destruct yes1 as [tm1 [tm1_lt_t stMatch1]].
       destruct yes2 as [tm2 [tm2_lt_t stMatch2]].
       unfold lastMatchAtomStore in stMatch2.
@@ -656,7 +640,6 @@ Section ForAddr.
 
       case_eq (respFn tm1); case_eq (respFn tm2).
 
-      SCase "some tm1, some tm2".
       intros r r2Eq; destruct r; rewrite r2Eq in *;
       intros r r1Eq; destruct r; rewrite r1Eq in *; simpl in *.
 
@@ -675,7 +658,6 @@ Section ForAddr.
       assert (opts: tm1 = tm2 \/ tm1 < tm2 \/ tm1 > tm2) by omega.
       destruct opts.
 
-      SSCase "tm1 = tm2".
       rewrite H in *.
       rewrite r1Eq in r2Eq.
       injection r2Eq as dEq iEq pEq aEq.
@@ -690,7 +672,6 @@ Section ForAddr.
 
       destruct H.
 
-      SSCase "tm1 < tm2".
       destruct (reqFn addrR1 procR1 idx1).
       destruct stMatch1 as [u0 stMatch1].
       rewrite u0 in *.
@@ -701,7 +682,6 @@ Section ForAddr.
       destruct (reqFn addrR1 procR0 idx0).
       generalize stMatch2 noLater; clear; intuition.
 
-      SSCase "tm2 < tm1".
       destruct (reqFn addrR0 procR0 idx0).
       destruct stMatch2 as [_ noLater].
       assert (c1: S tm2 <= tm1 < t) by omega.
@@ -712,15 +692,12 @@ Section ForAddr.
       destruct (reqFn addrR1 procR1 idx1).
       generalize stMatch1 noLater; clear; intuition.
 
-      SCase "some tm1, none tm2".
       intros r2Eq r r1Eq; destruct r; rewrite r2Eq in *; rewrite r1Eq in *;
       simpl in *; intuition.
 
-      SCase "none tm1, some tm2".
       intros r r2Eq r1Eq; destruct r; rewrite r2Eq, r1Eq in *.
       simpl in *; intuition.
 
-      SCase "none tm1, none tm2".
       intros r2Eq r1Eq; rewrite r2Eq, r1Eq in *.
       simpl in *; intuition.
 

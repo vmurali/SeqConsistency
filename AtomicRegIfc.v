@@ -2,6 +2,9 @@ Set Implicit Arguments.
 
 Require Import DataTypes StoreAtomicity.
 
+Definition Cache := Proc.
+Definition decTree := decProc.
+
 Section ForAddr.
   Variable reqFn: Addr -> Cache -> Index -> Req.
 
