@@ -2,7 +2,6 @@ Require Import DataTypes L1 StoreAtomicity LatestValue Cache Channel Compatible
 Rules ChannelAxiom L1Axioms CompatBehavior LatestValueAxioms BehaviorAxioms MsiState.
 
 Set Implicit Arguments.
-Module mkTop.
   Module l1 := mkL1Axioms.
   Module ch' := mkChannel.
   Module ch := mkChannelPerAddr mkDataTypes ch'.
@@ -187,4 +186,4 @@ Module mkTop.
       apply (Build_StoreAtomicity reqFn respFn
             (@uniqRespLabels') (@localOrdering') (@allPrevious') (storeAtomicity')).
     Qed.
-End mkTop.
+

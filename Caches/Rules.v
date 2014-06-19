@@ -404,22 +404,7 @@ Proof.
 Qed.
 Opaque sys' init' trans'.
 
-Theorem oneBeh: Behavior.
-Proof.
-  pose (fun t => fst (getStreamState t cstm)) as H.
-  assert (H 0 = initGlobalState).
-  unfold H.
-  simpl.
-  destruct cstm.
-  reflexivity.
-  assert (forall t, Transition (sys' t) (sys' (S t))).
-  intros.
-  pose proof (stateNSndStateSnFst t cstm).
-  pose proof (getStreamTransition t cstm).
-  rewrite H1 in H2.
-  assumption.
-  apply (Build_Behavior H H0 H1).
-Qed.
+Definition oneBeh := Build_Behavior sys' init' trans'.
 
 Fixpoint labelCh t ch src dst :=
   match t with

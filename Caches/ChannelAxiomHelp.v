@@ -1,6 +1,8 @@
 Require Import Rules DataTypes Omega Useful List Coq.Logic.Classical.
 Import mkDataTypes.
 
+Opaque oneBeh.
+
 Theorem enqGreater':
   forall {s p c t i}, In i (labelCh t s p c) -> t > i.
 Proof.

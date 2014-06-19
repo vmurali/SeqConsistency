@@ -1,5 +1,7 @@
 Require Import Coq.Logic.Classical Rules DataTypes MsiState L1 Omega Coq.Relations.Relation_Operators Coq.Lists.Streams DataTypes.
 
+Opaque oneBeh.
+
 Module mkL1Axioms : L1Axioms mkDataTypes.
   Import mkDataTypes.
 

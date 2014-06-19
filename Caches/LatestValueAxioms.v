@@ -1,5 +1,7 @@
 Require Import Rules Channel DataTypes MsiState ChannelAxiomHelp.
 
+Opaque oneBeh.
+
 Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
   Import mkDataTypes ch.
 

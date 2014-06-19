@@ -1,5 +1,6 @@
 Require Import Omega Useful Rules ChannelAxiom ChannelAxiomHelp Channel Coq.Logic.Classical MsiState DataTypes Tree HierProperties Cache.
 
+Opaque oneBeh.
 Module ch' := mkChannel.
 Module ch := mkChannelPerAddr mkDataTypes ch'.
 Module mkBehaviorAxioms: BehaviorAxioms mkDataTypes ch.
