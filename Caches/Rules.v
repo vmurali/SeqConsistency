@@ -377,7 +377,49 @@ Record Behavior := {
                     trans: forall t, Transition (sys t) (sys (S t))
                   }.
 
-Parameter oneBeh: Behavior.
+Require Import Transitions.
+
+Definition CacheStream := Stream Transition.
+Opaque CacheStream.
+
+Parameter cstm: CacheStream initGlobalState.
+
+Definition sys' (t: nat): GlobalState :=
+  (fst (getStreamState t cstm)).
+
+Theorem init': sys' 0 = initGlobalState.
+Proof.
+  unfold sys'.
+  simpl.
+  destruct cstm.
+  reflexivity.
+Qed.
+
+Theorem trans' t: Transition (sys' t) (sys' (S t)).
+Proof.
+  pose proof (stateNSndStateSnFst t cstm).
+  pose proof (getStreamTransition t cstm).
+  rewrite H in H0.
+  assumption.
+Qed.
+Opaque sys' init' trans'.
+
+Theorem oneBeh: Behavior.
+Proof.
+  pose (fun t => fst (getStreamState t cstm)) as H.
+  assert (H 0 = initGlobalState).
+  unfold H.
+  simpl.
+  destruct cstm.
+  reflexivity.
+  assert (forall t, Transition (sys' t) (sys' (S t))).
+  intros.
+  pose proof (stateNSndStateSnFst t cstm).
+  pose proof (getStreamTransition t cstm).
+  rewrite H1 in H2.
+  assumption.
+  apply (Build_Behavior H H0 H1).
+Qed.
 
 Fixpoint labelCh t ch src dst :=
   match t with
