@@ -442,26 +442,27 @@ Section ComplexSimulate.
    * To Prove: (A1+B2) transition can be converted to (A2+B2)
    *)
   Section ProvingStatesMatch.
-    Variable convertA1ToA2:
-      (forall a1 a1', TransA1 a1 a1' ->
-                      TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
-
-    Variable ioConvertA1ToA2: Io -> Io.
-    Variable transB2Convert: forall s1 s2, TransB2 s1 s2 -> TransB2 s1 s2.
-
-    Variable transB2ConvertGood:
-    forall s1 s2 (t: TransB2 s1 s2),
-      getTransB2Io (transB2Convert t) = ioConvertA1ToA2 (getTransB2Io t).
-
-    Variable convertA1ToA2Good:
-    forall s1 s2 (t: TransA1 s1 s2),
-      getTransA2Io (convertA1ToA2 t) = ioConvertA1ToA2 (getTransA1Io t).
-
     Variable convertB1ToB2:
       (forall b1 (sb1: Stream TransB1 b1),
        exists b2 (sb2: Stream TransB2 b2),
          forall n, getStreamIo getTransB1Io n sb1 = getStreamIo getTransB2Io n sb2).
 
+    Variable transB2Convert: forall s1 s2, TransB2 s1 s2 -> TransB2 s1 s2.
+
+    Variable ioConvertA1ToA2: Io -> Io.
+
+    Variable transB2ConvertGood:
+    forall s1 s2 (t: TransB2 s1 s2),
+      getTransB2Io (transB2Convert t) = ioConvertA1ToA2 (getTransB2Io t).
+
+    Variable convertA1ToA2:
+    (forall a1 a1', TransA1 a1 a1' ->
+                    TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
+
+    Variable convertA1ToA2Good:
+    forall s1 s2 (t: TransA1 s1 s2),
+      getTransA2Io (convertA1ToA2 t) = ioConvertA1ToA2 (getTransA1Io t).
+    
     Theorem bigCondition:
       forall a1 a1' (ta1: TransA1 a1 a1')
              b21 b21' (tb1: TransB2 b21 b21')
@@ -488,16 +489,15 @@ Section ComplexSimulate.
       apply (ABTrans getTransA2Io getTransB2Io _ _ _ _ _ _ pf).
     Qed.
 
-    Theorem statesMatchBigCond:
+    Theorem statesMatchFinal:
       forall a1 b1 (sa1b1: Stream TransA1B1 (a1,b1)),
-        exists a2 b2 (sa2b2: Stream TransA2B2 (a2,b2)),
-          forall n, getA2FromA1 (fst (fst (getStreamState n sa1b1))) =
-                    fst (fst (getStreamState n sa2b2)).
+      exists a2 b2 (sa2b2: Stream TransA2B2 (a2,b2)),
+        forall n, getA2FromA1 (fst (fst (getStreamState n sa1b1))) =
+                  fst (fst (getStreamState n sa2b2)).
     Proof.
       intros.
       apply (statesMatch canConvert convertB1ToB2 sa1b1).
     Qed.
     
   End ProvingStatesMatch.
-
 End ComplexSimulate.
