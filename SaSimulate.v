@@ -1143,8 +1143,9 @@ Section AtomicMem.
   Qed.
 
   Theorem matchIoCacheAm n:
-    getIo (getStreamTransition n stm) = getStreamIo (@getAmIo reqFn) n (buildAmStream 0).
+    getStreamIo getIo n stm = getStreamIo (@getAmIo reqFn) n (buildAmStream 0).
   Proof.
+    unfold getStreamIo.
     pose proof (sameAmIo n 0) as sth.
     assert (H: n+0 = n) by omega.
     rewrite H in sth.
