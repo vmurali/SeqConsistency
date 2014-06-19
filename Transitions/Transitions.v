@@ -519,5 +519,3 @@ Section ComplexSimulate.
     
   End ProvingStatesMatch.
 End ComplexSimulate.
-
-About statesMatchFinal.
