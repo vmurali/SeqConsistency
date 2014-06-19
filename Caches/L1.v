@@ -2,8 +2,6 @@ Require Import DataTypes Omega Coq.Logic.Classical MsiState.
 
 Module Type L1Axioms (dt: DataTypes).
   Import dt.
-  Axiom deqOrNot: forall t, {x| deqR (fst (fst x)) (snd (fst x)) (snd x) t} +
-                            {forall a c i, ~ deqR a c i t}.
   Axiom deqLeaf: forall {c a i t}, deqR a c i t -> leaf c.
   Axiom deqDef: forall {c a i t}, deqR a c i t -> defined c.
   Axiom uniqDeqProc: forall {c a i1 t i2},
@@ -50,7 +48,5 @@ Module Type L1Theorems (dt: DataTypes) (l1A: L1Axioms dt).
   Parameter uniqM:
   forall {c a t}, defined c -> leaf c ->
     state c a t = Mo -> forall {co}, defined co -> leaf co -> c <> co -> state co a t = In.
-
-  Parameter deqOrNot: forall t, {x| deqR (fst (fst x)) (snd (fst x)) (snd x) t} + {forall a c i, ~ deqR a c i t}.
 
 End L1Theorems.

@@ -11,6 +11,24 @@ Set Implicit Arguments.
   Module l1T := LatestValueTheorems mkDataTypes ch ba l1 comp lv.
     Import mkDataTypes l1 l1T.
 
+
+  Theorem deqOrNot: forall t, {x| deqR (fst (fst x)) (snd (fst x)) (snd x) t} + {forall a c i, ~ deqR a c i t}.
+  Proof.
+    intros t.
+    unfold deqR.
+    destruct (trans oneBeh t).
+    (left; apply (exist _ (a, c, (req (sys oneBeh t) a c)))); intuition.
+    (left; apply (exist _ (a, c, (req (sys oneBeh t) a c)))); intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+    right; intuition.
+  Qed.
+
     Definition respFn t :=
       match deqOrNot t with
         | inleft pf =>
@@ -24,6 +42,8 @@ Set Implicit Arguments.
           end
         | inright _ => None
       end.
+
+    Require Import Transitions.
 
     Ltac finish := repeat match goal with
                             | [s: {_|_} |- _] => destruct s
@@ -95,7 +115,7 @@ Set Implicit Arguments.
       apply (uniqDeqProc3 d0 deq2).
       constructor.
       intuition.
-      apply (n _ _ _ deq2).
+      apply (n0 _ _ _ deq2).
       intuition.
     Qed.
 
@@ -127,13 +147,13 @@ Set Implicit Arguments.
       destruct (deqOrNot t).
       finish.
       pose proof (processDeq d) as procD.
-      destruct (reqFn a c i); simpl.
+      destruct (reqFn a t0 n); simpl.
       simpl in *.
       destruct desc.
       pose proof (deqLeaf d) as lf.
       pose proof (deqDef d) as def.
-      assert (le: sle Sh (state c a t)) by
-          (unfold sle; destruct (state c a t); auto).
+      assert (le: sle Sh (state t0 a t)) by
+          (unfold sle; destruct (state t0 a t); auto).
       pose proof (latestValue def lf le) as lv.
       destruct lv as [[dtMatch noPrev]|prev].
       left.
@@ -142,8 +162,8 @@ Set Implicit Arguments.
       finish.
       pose proof (deqDef d0) as def0.
       assert (cond: 0 <= t' < t) by omega.
-      specialize (noPrev _ cond _ i0 def0).
-      destruct (reqFn a c0 i0).
+      specialize (noPrev _ cond _ n0 def0).
+      destruct (reqFn a t1 n0).
       intros; simpl in *.
       rewrite H0 in *.
       intuition.
@@ -167,13 +187,13 @@ Set Implicit Arguments.
       intros x.
       rewrite x in *.
       pose proof (deqDef d1) as defdeq.
-      specialize (rest _ cond _ i1 defdeq).
-      destruct (reqFn a c1 i1); simpl in *.
+      specialize (rest _ cond _ n1 defdeq).
+      destruct (reqFn a t2 n1); simpl in *.
       generalize rest d1; clear; intuition.
 
       intuition.
 
-      apply (n _ _ _ deq_tb).
+      apply (n0 _ _ _ deq_tb).
       intuition.
       intuition.
     Qed.

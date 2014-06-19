@@ -5,23 +5,6 @@ Opaque oneBeh.
 Module mkL1Axioms : L1Axioms mkDataTypes.
   Import mkDataTypes.
 
-  Theorem deqOrNot: forall t, {x| deqR (fst (fst x)) (snd (fst x)) (snd x) t} + {forall a c i, ~ deqR a c i t}.
-  Proof.
-    intros t.
-    unfold deqR.
-    destruct (trans oneBeh t).
-    (left; apply (exist _ (a, c, (req (sys oneBeh t) a c)))); intuition.
-    (left; apply (exist _ (a, c, (req (sys oneBeh t) a c)))); intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-    right; intuition.
-  Qed.
-
   Theorem deqLeaf: forall {c a i t}, deqR a c i t -> leaf c.
   Proof.
     intros c a i t deqr.

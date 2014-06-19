@@ -401,7 +401,7 @@ Proof.
   pose proof (getStreamTransition t cstm).
   rewrite H in H0.
   assumption.
-Qed.
+Defined.
 Opaque sys' init' trans'.
 
 Definition oneBeh := Build_Behavior sys' init' trans'.

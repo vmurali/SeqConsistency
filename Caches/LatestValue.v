@@ -666,6 +666,4 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     pose proof (allLatestValue cDef more cond) as useful.
     assumption.
   Qed.
-
-  Definition deqOrNot := l1.deqOrNot.
 End LatestValueTheorems.
