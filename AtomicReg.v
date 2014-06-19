@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity NamedTrans Useful AtomicRegIfc.
+Require Import DataTypes StoreAtomicity NamedTrans Useful AtomicRegIfc Transitions.
 
 Set Implicit Arguments.
 
@@ -403,14 +403,20 @@ Section ForAddr.
     intuition.
   Qed.
 
-  Definition atomicResp s s' (t: AtomicTrans reqFn s s') :=
+  Definition getTransIo s s' (t: AtomicTrans reqFn s s') :=
     match t with
-      | AReq a c => Some (Build_Resp a c (next s a c)
-                                  match desc (reqFn a c (next s a c)) with
-                                    | Ld => mem s a
-                                    | St => initData zero
-                                  end)
+      | AReq a c => Some (a, c, dataQ (reqFn a c (next s a c)),
+                          desc (reqFn a c (next s a c)),
+                          if desc (reqFn a c (next s a c))
+                          then mem s a
+                          else initData zero)
       | Idle => None
+    end.
+
+  Definition atomicResp s s' (t: AtomicTrans reqFn s s') :=
+    match getTransIo t with
+      | Some (a, c, d, w, ld) => Some (Build_Resp a c (next s a c) ld)
+      | None => None
     end.
 
   Definition sameResp r1 r2 :=
@@ -761,37 +767,45 @@ Section ForAddr.
     apply respEq'.
   Qed.
 
-  Fixpoint getResp n s (al: AtomicTransList reqFn s) :=
-    match n with
-      | 0 => match al with
-               | Cons _ _ atss' als' => atomicResp atss'
-             end
-      | S m => match al with
-                 | Cons _ _ _ als' => getResp m als'
-               end
+  Definition getCacheIo n :=
+    match respFn n with
+      | Some (Build_Resp a c i ld) => Some (a, c, dataQ (reqFn a c i), desc (reqFn a c i), ld)
+      | None => None
     end.
 
-  CoFixpoint buildAl n: AtomicTransList reqFn (lSt (getTransList getTransNext n))
-                                         := Cons (getTrans getTransNext n) (buildAl (S n)).
-
-  Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
+  Lemma ioEq n: getCacheIo n = getTransIo (getTrans getTransNext n).
   Proof.
+    unfold getCacheIo.
+    pose proof (respEq n).
+    rewrite H.
     unfold getAtomicResp.
-    induction n.
-    simpl.
+    unfold atomicResp.
+    unfold getTransIo.
+    destruct ( (getTrans getTransNext n)).
     reflexivity.
-    intros.
-    simpl.
-    specialize (IHn (S m)).
-
-    assert (eq: n + S m = S (n + m)) by omega.
-    rewrite eq in *.
-    intuition.
+    reflexivity.
   Qed.
 
-  Lemma getRespEq n: getResp n (buildAl 0) = getAtomicResp n.
+  CoFixpoint buildAl n: Stream (AtomicTrans reqFn) (lSt (getTransList getTransNext n))
+    := TCons _ (getTrans getTransNext n) (buildAl (S n)).
+
+  Lemma getIoEq' n:
+    forall m,
+      getTransIo (getStreamTransition n (buildAl m)) =
+      getTransIo (getTrans getTransNext (n + m)).
   Proof.
-    pose proof (getRespEq' n 0) as sth.
+    induction n.
+    intros; reflexivity.
+    intros; specialize (IHn (S m)).
+    assert (S n + m = n + S m) by omega.
+    rewrite H.
+    assumption.
+  Qed.
+
+  Lemma getIoEq n: getTransIo (getStreamTransition n (buildAl 0)) =
+                   getTransIo (getTrans getTransNext (n)).
+  Proof.
+    pose proof (getIoEq' n 0) as sth.
     assert (eq: n+0 = n) by omega.
     rewrite eq in *.
     intuition.

@@ -1,6 +1,6 @@
 Set Implicit Arguments.
 
-Require Import DataTypes StoreAtomicity.
+Require Import DataTypes StoreAtomicity Transitions.
 
 Definition Cache := Proc.
 Definition decTree := decProc.
@@ -31,8 +31,5 @@ Section ForAddr.
                                        else next s a' t
                                     ))
   | Idle: AtomicTrans s s.
-  
-  CoInductive AtomicTransList: State -> Set :=
-    | Cons: forall s s', AtomicTrans s s' -> AtomicTransList s' -> AtomicTransList s.
 
 End ForAddr.
