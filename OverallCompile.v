@@ -122,6 +122,24 @@ Section SimulateIoDefns.
         getStreamIo getTransAIo n sas = getStreamIo getTransBIo n sbs.
 End SimulateIoDefns.
 
+Section SimulateIo.
+  Variable StateA StateB StateC Io: Set.
+  Variable TransA: AllTransitions StateA.
+  Variable TransB: AllTransitions StateB.
+  Variable TransC: AllTransitions StateC.
+  Variable getTransAIo: GetTransitionIo TransA Io.
+  Variable getTransBIo: GetTransitionIo TransB Io.
+  Variable getTransCIo: GetTransitionIo TransC Io.
+
+  Theorem ioSimulateTransitive:
+    StreamIoSimulate getTransAIo getTransBIo ->
+    StreamIoSimulate getTransBIo getTransCIo ->
+    StreamIoSimulate getTransAIo getTransBIo.
+  Proof.
+    intuition.
+  Qed.
+End SimulateIo.
+
 (* Parallely composing two transitions with matching IOs
  * We ensure that each transition is executed simultaneously, and the IOs match
  * A + B
@@ -501,3 +519,5 @@ Section ComplexSimulate.
     
   End ProvingStatesMatch.
 End ComplexSimulate.
+
+About statesMatchFinal.
