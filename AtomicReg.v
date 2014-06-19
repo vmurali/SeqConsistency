@@ -1,4 +1,4 @@
-Require Import DataTypes StoreAtomicity Case NamedTrans Useful AtomicRegIfc.
+Require Import DataTypes StoreAtomicity NamedTrans Useful AtomicRegIfc Transitions.
 
 Set Implicit Arguments.
 
@@ -255,7 +255,6 @@ Section ForAddr.
     unfold latestAtomValue.
     destruct now as [noPrevNonSt | [prevNonSt | st]].
 
-    Case "noPrevNonSt".
     unfold atomNoPrevNonSt in *.
     left.
     constructor.
@@ -265,7 +264,6 @@ Section ForAddr.
     assert (opts: 0 <= t' < t \/ t' = t) by omega.
     destruct opts as [done | eq]; [| rewrite eq]; intuition.
 
-    Case "prevNonSt".
     right.
     unfold atomPrevNonSt in *.
     destruct prevNonSt as [[tm [cond lm]] noCurr].
@@ -286,7 +284,6 @@ Section ForAddr.
     rewrite ez2 in *; intuition.
     intuition.
 
-    Case "st".
     right.
     unfold atomSt in st.
     exists t.
@@ -299,10 +296,8 @@ Section ForAddr.
   Proof.
     induction t.
 
-    Case "0".
     left; constructor; [| intros t' contra; assert False by omega]; intuition.
 
-    Case "S t".
     apply latestAtomInd.
 
     unfold atomNoPrevNonSt.
@@ -329,30 +324,24 @@ Section ForAddr.
     destruct (trans (getTransNext (lTrans (getTransList getTransNext t))));
       simpl in *.
 
-    SCase "AReq".
     destruct (decAddr a a0).
     rewrite <- e in *; clear e.
 
-    SSCase "a = a0".
     case_eq (reqFn a c (next (lSt (getTransList getTransNext t)) a c)); simpl;
     intros desc dataQ reqF.
     destruct desc.
 
-    SSSCase "Ld".
     simpl in *.
     destruct IHt.
 
-    SSSSCase "NoPrev".
     left.
     intuition.
     discriminate.
 
-    SSSSCase "Prev".
     right; left.
     intuition.
     discriminate.
 
-    SSSCase "St".
     right; right.
     destruct (decAddr a a).
     constructor. intuition.
@@ -388,7 +377,6 @@ Section ForAddr.
     intuition.
     intuition.
 
-    SSCase "Idle".
     destruct IHt; intuition.
   Qed.
 
@@ -415,14 +403,20 @@ Section ForAddr.
     intuition.
   Qed.
 
-  Definition atomicResp s s' (t: AtomicTrans reqFn s s') :=
+  Definition getTransIo s s' (t: AtomicTrans reqFn s s') :=
     match t with
-      | AReq a c => Some (Build_Resp a c (next s a c)
-                                  match desc (reqFn a c (next s a c)) with
-                                    | Ld => mem s a
-                                    | St => initData zero
-                                  end)
+      | AReq a c => Some (a, c, dataQ (reqFn a c (next s a c)),
+                          desc (reqFn a c (next s a c)),
+                          if desc (reqFn a c (next s a c))
+                          then mem s a
+                          else initData zero)
       | Idle => None
+    end.
+
+  Definition atomicResp s s' (t: AtomicTrans reqFn s s') :=
+    match getTransIo t with
+      | Some (a, c, d, w, ld) => Some (Build_Resp a c (next s a c) ld)
+      | None => None
     end.
 
   Definition sameResp r1 r2 :=
@@ -593,11 +587,9 @@ Section ForAddr.
 
       destruct atom1 as [no1|yes1]; destruct atom2 as [no2|yes2].
 
-      Case "noBefore1, noBefore 2".
       destruct no1 as [u1 _]; destruct no2 as [u2 _].
       rewrite <- u1 in u2; assumption.
 
-      Case "noBefore1, before 2".
       destruct yes2 as [tm [tm_lt_t stMatch]].
       unfold lastMatchAtomStore in stMatch.
       specialize (prevEq tm_lt_t).
@@ -621,7 +613,6 @@ Section ForAddr.
 
       intros respmEq; rewrite respmEq in *; simpl in *; intuition.
 
-      Case "before1, noBefore 2".
       destruct yes1 as [tm [tm_lt_t' stMatch]].
       specialize (prevEq tm_lt_t').
       assert (tm_lt_t: 0 <= tm < t) by omega.
@@ -641,7 +632,6 @@ Section ForAddr.
 
       intros respmEq; rewrite respmEq in *; simpl in *; intuition.
       
-      Case "before1, before 2".
       destruct yes1 as [tm1 [tm1_lt_t stMatch1]].
       destruct yes2 as [tm2 [tm2_lt_t stMatch2]].
       unfold lastMatchAtomStore in stMatch2.
@@ -656,7 +646,6 @@ Section ForAddr.
 
       case_eq (respFn tm1); case_eq (respFn tm2).
 
-      SCase "some tm1, some tm2".
       intros r r2Eq; destruct r; rewrite r2Eq in *;
       intros r r1Eq; destruct r; rewrite r1Eq in *; simpl in *.
 
@@ -675,7 +664,6 @@ Section ForAddr.
       assert (opts: tm1 = tm2 \/ tm1 < tm2 \/ tm1 > tm2) by omega.
       destruct opts.
 
-      SSCase "tm1 = tm2".
       rewrite H in *.
       rewrite r1Eq in r2Eq.
       injection r2Eq as dEq iEq pEq aEq.
@@ -690,7 +678,6 @@ Section ForAddr.
 
       destruct H.
 
-      SSCase "tm1 < tm2".
       destruct (reqFn addrR1 procR1 idx1).
       destruct stMatch1 as [u0 stMatch1].
       rewrite u0 in *.
@@ -701,7 +688,6 @@ Section ForAddr.
       destruct (reqFn addrR1 procR0 idx0).
       generalize stMatch2 noLater; clear; intuition.
 
-      SSCase "tm2 < tm1".
       destruct (reqFn addrR0 procR0 idx0).
       destruct stMatch2 as [_ noLater].
       assert (c1: S tm2 <= tm1 < t) by omega.
@@ -712,15 +698,12 @@ Section ForAddr.
       destruct (reqFn addrR1 procR1 idx1).
       generalize stMatch1 noLater; clear; intuition.
 
-      SCase "some tm1, none tm2".
       intros r2Eq r r1Eq; destruct r; rewrite r2Eq in *; rewrite r1Eq in *;
       simpl in *; intuition.
 
-      SCase "none tm1, some tm2".
       intros r r2Eq r1Eq; destruct r; rewrite r2Eq, r1Eq in *.
       simpl in *; intuition.
 
-      SCase "none tm1, none tm2".
       intros r2Eq r1Eq; rewrite r2Eq, r1Eq in *.
       simpl in *; intuition.
 
@@ -784,37 +767,45 @@ Section ForAddr.
     apply respEq'.
   Qed.
 
-  Fixpoint getResp n s (al: AtomicTransList reqFn s) :=
-    match n with
-      | 0 => match al with
-               | Cons _ _ atss' als' => atomicResp atss'
-             end
-      | S m => match al with
-                 | Cons _ _ _ als' => getResp m als'
-               end
+  Definition getCacheIo n :=
+    match respFn n with
+      | Some (Build_Resp a c i ld) => Some (a, c, dataQ (reqFn a c i), desc (reqFn a c i), ld)
+      | None => None
     end.
 
-  CoFixpoint buildAl n: AtomicTransList reqFn (lSt (getTransList getTransNext n))
-                                         := Cons (getTrans getTransNext n) (buildAl (S n)).
-
-  Lemma getRespEq' n: forall m, getResp n (buildAl m) = getAtomicResp (n + m).
+  Lemma ioEq n: getCacheIo n = getTransIo (getTrans getTransNext n).
   Proof.
+    unfold getCacheIo.
+    pose proof (respEq n).
+    rewrite H.
     unfold getAtomicResp.
-    induction n.
-    simpl.
+    unfold atomicResp.
+    unfold getTransIo.
+    destruct ( (getTrans getTransNext n)).
     reflexivity.
-    intros.
-    simpl.
-    specialize (IHn (S m)).
-
-    assert (eq: n + S m = S (n + m)) by omega.
-    rewrite eq in *.
-    intuition.
+    reflexivity.
   Qed.
 
-  Lemma getRespEq n: getResp n (buildAl 0) = getAtomicResp n.
+  CoFixpoint buildAl n: Stream (AtomicTrans reqFn) (lSt (getTransList getTransNext n))
+    := TCons _ (getTrans getTransNext n) (buildAl (S n)).
+
+  Lemma getIoEq' n:
+    forall m,
+      getTransIo (getStreamTransition n (buildAl m)) =
+      getTransIo (getTrans getTransNext (n + m)).
   Proof.
-    pose proof (getRespEq' n 0) as sth.
+    induction n.
+    intros; reflexivity.
+    intros; specialize (IHn (S m)).
+    assert (S n + m = n + S m) by omega.
+    rewrite H.
+    assumption.
+  Qed.
+
+  Lemma getIoEq n: getTransIo (getStreamTransition n (buildAl 0)) =
+                   getTransIo (getTrans getTransNext (n)).
+  Proof.
+    pose proof (getIoEq' n 0) as sth.
     assert (eq: n+0 = n) by omega.
     rewrite eq in *.
     intuition.
