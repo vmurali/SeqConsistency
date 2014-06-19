@@ -51,6 +51,20 @@ Section AtomicMem.
                            end
     end.
 
+  Theorem getNCacheTrans'Eq n: forall r (ls: CacheTransStream r) is,
+                                 fst (getNCacheTrans' ls is n) =
+                                 getStreamTransition n ls.
+  Proof.
+    induction n.
+    intros.
+    destruct ls.
+    reflexivity.
+    intros.
+    destruct ls.
+    simpl.
+    apply (IHn _ ls).
+  Qed.
+
   Definition getNCacheTrans n := getNCacheTrans' stm (fun a p => 0) n.
 
   Variable allPresent:
@@ -283,31 +297,6 @@ Section AtomicMem.
                                           else next s a' t
                                     ))
   | Idle: AtomicTrans s s.
-
-  Inductive AtomicTrans': State -> State -> Set :=
-  | AReq': forall s a c, AtomicTrans' s (Build_State
-                                           (match desc (reqFn a c (next s a c)) with
-                                              | Ld => mem s
-                                              | St => fun a' =>
-                                                        if decAddr a a'
-                                                        then dataQ (reqFn a' c (next s a c))
-                                                        else mem s a'
-                                            end)
-                                           (fun a' t =>
-                                              if decAddr a a'
-                                              then match decProc t c with
-                                                     | left _ => S (next s a' t)
-                                                     | _ => next s a' t
-                                                   end
-                                              else next s a' t
-                                        ))
-  | Idle': forall s, AtomicTrans' s s.
-
-  Definition get' s s' (t: AtomicTrans s s') :=
-    match t with
-      | AReq a c => AReq' s a c
-      | Idle => Idle' s
-    end.
 
   Definition AtomicList := TransList AtomicTrans (Build_State initData (fun a t => 0)).
 
@@ -1059,8 +1048,33 @@ Section AtomicMem.
       | (t, _) => t
     end.
 
-  Lemma fullEq n:
-    match getInfo (justTrans n), get' (getTrans getTransNext n) with
+  Inductive AtomicTrans': State -> State -> Set :=
+  | AReq': forall s a c, AtomicTrans' s (Build_State
+                                           (match desc (reqFn a c (next s a c)) with
+                                              | Ld => mem s
+                                              | St => fun a' =>
+                                                        if decAddr a a'
+                                                        then dataQ (reqFn a' c (next s a c))
+                                                        else mem s a'
+                                            end)
+                                           (fun a' t =>
+                                              if decAddr a a'
+                                              then match decProc t c with
+                                                     | left _ => S (next s a' t)
+                                                     | _ => next s a' t
+                                                   end
+                                              else next s a' t
+                                        ))
+  | Idle': forall s, AtomicTrans' s s.
+
+  Definition get' s s' (t: AtomicTrans s s') :=
+    match t with
+      | AReq a c => AReq' s a c
+      | Idle => Idle' s
+    end.
+
+  Lemma fullEq' n:
+    match getInfo (fst (getNCacheTrans n)), get' (getTrans getTransNext n) with
       | Some (a, p, d, w, ld), AReq' s a' p' =>
           a = a' /\ p = p' /\ w = desc (reqFn a' p' (next s a' p')) /\
                                        d = dataQ (reqFn a' p' (next s a' p')) /\
@@ -1073,7 +1087,6 @@ Section AtomicMem.
     end.
   Proof.
     unfold get'.
-    unfold justTrans; simpl.
     pose proof (semiEq n) as semiEq.
     pose proof (semiEq' n) as semiEq'.
     pose proof (respEq n) as respEq.
@@ -1082,20 +1095,42 @@ Section AtomicMem.
     unfold respFn in semiEq.
     pose proof (getPf n) as y.
     destruct (getNCacheTrans n) as [t o].
-    simpl in semiEq'.
-    simpl in y.
+    simpl in *.
     destruct (getInfo t) as [p|].
     destruct p as [p ld], p as [p w], p as [p d], p as [a p].
     destruct (getTrans getTransNext n) as [a' |].
     injection respEqExp; intros dEq idEq pEq aEq; clear respEqExp.
     destruct o as [i|].
     destruct semiEq' as [wEq xEq].
-    rewrite <- xEq, <- wEq, aEq, pEq, <- idEq in *.
-    destruct (desc (reqFn a' c i)); intuition.
+    simpl in *.
+    rewrite aEq, pEq in *.
+    rewrite <- idEq in *.
+    rewrite wEq, dEq in *.
+    destruct w; intuition.
     intuition.
     discriminate.
     destruct (getTrans getTransNext n) as [a' |].
     discriminate.
     intuition.
+  Qed.
+
+  Theorem matchRespWithTrans' n:
+    match getInfo (getStreamTransition n stm), get' (getTrans getTransNext n) with
+      | Some (a, p, d, w, ld), AReq' s a' p' =>
+          a = a' /\ p = p' /\ w = desc (reqFn a' p' (next s a' p')) /\
+                                       d = dataQ (reqFn a' p' (next s a' p')) /\
+                                                 match w with
+                                                   | Ld => ld = (mem s) a
+                                                   | St => ld = initData zero
+                                                 end
+      | None, Idle' s => True
+      | _, _ => False
+    end.
+  Proof.
+    pose proof (fullEq' n) as sth1.
+    pose proof (getNCacheTrans'Eq n stm (fun a p => 0)) as sth2.
+    unfold getNCacheTrans in sth1.
+    rewrite sth2 in sth1.
+    assumption.
   Qed.
 End AtomicMem.
