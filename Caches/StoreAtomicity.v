@@ -35,13 +35,13 @@ Section CreateInstantMemory.
       getStreamIo getTransIo t stm = Some (a, c, d, Ld, ld) ->
       (ld = initData a /\
      forall {ti}, 0 <= ti < t ->
-                  forall ci di ldi, defined ci ->
+                  forall ci di ldi,
                     ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb ldb, defined cb /\
+    (exists cb tb ldb,
        tb < t /\
        getStreamIo getTransIo tb stm = Some (a, cb, ld, St, ldb) /\
        forall ti, tb < ti < t ->
-                  forall ci di ldi, defined ci ->
+                  forall ci di ldi,
                     ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi));
 
    storeAtomicitySt:

@@ -16,11 +16,11 @@ Set Implicit Arguments.
     forall t a c d ld,
       getStreamCacheIo t = Some (a, c, d, Ld, ld) ->
       (ld = initData a /\
-     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+     forall {ti}, 0 <= ti < t -> forall ci di ldi,
                                    ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb ldb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, ld, St, ldb) /\
+    (exists cb tb ldb, tb < t /\ getStreamCacheIo tb = Some (a, cb, ld, St, ldb) /\
       forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
+                   forall ci di ldi,
                      ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
   Proof.
     intros.
@@ -60,15 +60,14 @@ Set Implicit Arguments.
       (forall ti : nat,
        0 <= ti < t ->
        forall (ci : Tree) (di ldi : Data),
-       defined ci -> getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)) \/
+       getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)) \/
       (exists (cb : Tree) (tb : nat) (ldb : Data),
-         defined cb /\
          tb < t /\
          getCacheIo _ _ (getStreamTransition tb cstm) = Some (a, cb, ld, St, ldb) /\
          (forall ti : nat,
           tb < ti < t ->
           forall (ci : Tree) (di ldi : Data),
-          defined ci -> getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)))).
+          getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)))).
     intros.
     pose proof (@storeAtomicityLd' t a c d ld).
     destruct H0.
@@ -77,26 +76,24 @@ Set Implicit Arguments.
     assumption.
     left.
     constructor; intuition.
-    specialize (H2 ti (conj H3 H4) ci di ldi H0).
     pose proof (sameThing ti).
-    rewrite <- H6 in H5.
+    rewrite <- H5 in H0.
+    specialize (H2 ti (conj H3 H4) ci di ldi H0).
     intuition.
     right.
-    destruct H0 as [cb [tb [ldb [defcb [cond [sth  rest]]]]]].
+    destruct H0 as [cb [tb [ldb [cond [sth  rest]]]]].
     exists cb, tb, ldb.
-    constructor.
-    intuition.
     constructor.
     intuition.
     constructor.
     pose proof (sameThing tb).
     rewrite H0 in sth.
     assumption.
-    intros.
-    specialize (rest ti H0 ci di ldi H1).
+    unfold not; intros.
+    specialize (rest ti H0 ci di ldi).
     pose proof (sameThing ti).
     rewrite H2 in rest.
-    assumption.
+    intuition.
     
 
     assert (great: forall t a c d ld,

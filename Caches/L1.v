@@ -21,11 +21,11 @@ Module Type L1Theorems (dt: DataTypes) (l1A: L1Axioms dt).
     leaf c ->
     sle Sh (state c a t) ->
     (data c a t = initData a /\
-     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+     forall {ti}, 0 <= ti < t -> forall ci di ldi,
                                    ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, data c a t, St, initData zero) /\
+    (exists cb tb, tb < t /\ getStreamCacheIo tb = Some (a, cb, data c a t, St, initData zero) /\
       forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
+                   forall ci di ldi,
                      ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
 
   Parameter uniqM:

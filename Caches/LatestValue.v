@@ -218,11 +218,11 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
                     sle Sh (state n a t) ->
                     (forall {c}, defined c -> parent c n -> sle (dir n c a t) Sh) ->
                     (data n a t = initData a /\
-                    forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+                    forall {ti}, 0 <= ti < t -> forall ci di ldi,
                                    ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, data n a t, St, initData zero) /\
+    (exists cb tb, tb < t /\ getStreamCacheIo tb = Some (a, cb, data n a t, St, initData zero) /\
       forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
+                   forall ci di ldi,
                      ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
     Proof.
       intros a t.
@@ -290,11 +290,12 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
 
 
-      assert (noStore: forall co, defined co ->
+      assert (noStore: forall co,
                                   co <> n -> forall d ld,
                                                ~ (getStreamCacheIo t = Some (a, co, d, St, ld))).
-      unfold not; intros co defCo co_ne_n d ld deqSt.
+      unfold not; intros co co_ne_n d ld deqSt.
       pose proof (deqLeaf deqSt) as leafCo.
+      pose proof (deqDef deqSt) as defCo.
       specialize (noneElse co defCo leafCo co_ne_n).
       pose proof (processDeq deqSt) as use; simpl in use.
       rewrite use in noneElse; unfold sle in *; auto.
@@ -311,9 +312,10 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       generalize defN triv deqSt triv2; clear; firstorder.
 
 
-      assert (good: forall c d ld, defined c ->
+      assert (good: forall c d ld,
                                    ~ getStreamCacheIo t = Some (a, c, d, St, ld)).
-      unfold not. intros c d ld defC deqc.
+      unfold not. intros c d ld deqc.
+      pose proof (deqDef deqc) as defC.
       destruct (classic (c = n)) as [eq|notEq].
       rewrite eq in *; generalize noNStore deqc; clear; firstorder.
       generalize noStore defC notEq deqc; clear; firstorder.
@@ -333,10 +335,10 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       rewrite rew.
       assumption.
 
-      destruct condResti as [tb [defCb [tb_lt_t [deqSt rest]]]].
+      destruct condResti as [tb [tb_lt_t [deqSt rest]]].
+      pose proof (deqDef deqSt) as defCb.
       right.
       exists cb; exists tb.
-      constructor. assumption.
       constructor.
       omega.
       constructor.
@@ -416,14 +418,15 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       pose proof (@leafGood2 p n a ts defP defN n_p m markm) as noDeq2.
 
       assert (goodT: forall t0, ts <= t0 <= t ->
-                                forall c d ld, defined c ->
+                                forall c d ld,
                                                ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
-      intros t0 cond.
+      intros t0 cond c d ld deqTo.
+      pose proof (deqDef deqTo) as sth.
       assert (H: ts < t0 <= t \/ t0 = ts) by omega.
       destruct H as [c1|c2].
-      apply (noDeq1 t0 c1).
+      apply (noDeq1 t0 c1 c d ld sth deqTo).
       rewrite c2 in *.
-      generalize noDeq2; clear; firstorder.
+      apply (noDeq2 c d ld sth deqTo).
 
 
       pose proof (cRecvmCond defP defN n_p recvm) as stEq.
@@ -470,9 +473,10 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
 
       right.
-      destruct condRest as [tb [defCb [tb_lt_ts [deqSt rest]]]].
+      destruct condRest as [tb [tb_lt_ts [deqSt rest]]].
       exists resti; exists tb.
-      constructor. assumption. constructor.
+      pose proof (deqDef deqSt) as deqCb.
+      constructor.
       assert (tb < S t) by omega. assumption.
       constructor. assumption.
       intros ti cond; assert (H: tb < ti < ts \/ ts <= ti <= t) by omega;
@@ -530,14 +534,15 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       pose proof (@leafGood3 n c a ts defN defC c_n m markm) as noDeq2.
 
       assert (goodT: forall t0, ts <= t0 <= t ->
-                                forall c d ld, defined c ->
+                                forall c d ld,
                                             ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
-      intros t0 cond.
+      intros t0 cond cx dx ldx sthx.
+      pose proof (deqDef sthx) as defx.
       assert (H: ts < t0 <= t \/ t0 = ts) by omega.
       destruct H as [c1|c2].
-      apply (noDeq1 t0 c1).
+      apply (noDeq1 t0 c1 cx dx ldx defx sthx).
       rewrite c2 in *.
-      generalize noDeq2; clear; firstorder.
+      apply (noDeq2 cx dx ldx defx sthx).
 
 
 
@@ -577,13 +582,14 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       apply (goodT ti tough).
 
       right.
-      destruct condRest as [tb [defCb [tb_lt_ts [deqSt rest]]]].
+      destruct condRest as [tb [tb_lt_ts [deqSt rest]]].
       exists resti; exists tb.
-      constructor. assumption. constructor.
+      pose proof (deqDef deqSt) as deqCb.
+      constructor.
       assert (tb < S t) by omega. assumption.
       constructor. assumption.
       intros ti cond; assert (H: tb < ti < ts \/ ts <= ti <= t) by omega;
-     destruct H as [ind|tough].
+      destruct H as [ind|tough].
       apply (rest ti ind).
       apply (goodT ti tough).
 
@@ -609,11 +615,11 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     leaf c ->
     sle Sh (state c a t) ->
     (data c a t = initData a /\
-     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+     forall {ti}, 0 <= ti < t -> forall ci di ldi,
                                    ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, data c a t, St, initData zero) /\
+    (exists cb tb, tb < t /\ getStreamCacheIo tb = Some (a, cb, data c a t, St, initData zero) /\
       forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
+                   forall ci di ldi,
                      ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
   Proof.
     intros a c t cDef leafC more.
