@@ -15,7 +15,7 @@ Set Implicit Arguments.
   Theorem storeAtomicityLd':
     forall t a c d ld,
       getStreamCacheIo t = Some (a, c, d, Ld, ld) ->
-      (d = initData zero /\ ld = initData a /\
+      (ld = initData a /\
      forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
                                    ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
     (exists cb tb ldb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, ld, St, ldb) /\
@@ -56,7 +56,6 @@ Set Implicit Arguments.
   Proof.
     assert  (forall (t: Time) (a : Addr) (c : Tree) (d ld : Data),
       getCacheIo _ _ (getStreamTransition t cstm) = Some (a, c, d, Ld, ld) ->
-      d = initData zero /\
       ld = initData a /\
       (forall ti : nat,
        0 <= ti < t ->
@@ -78,9 +77,9 @@ Set Implicit Arguments.
     assumption.
     left.
     constructor; intuition.
-    specialize (H3 ti (conj H4 H5) ci di ldi H2).
+    specialize (H2 ti (conj H3 H4) ci di ldi H0).
     pose proof (sameThing ti).
-    rewrite <- H7 in H6.
+    rewrite <- H6 in H5.
     intuition.
     right.
     destruct H0 as [cb [tb [ldb [defcb [cond [sth  rest]]]]]].

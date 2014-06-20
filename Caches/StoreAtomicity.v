@@ -32,7 +32,7 @@ Section CreateInstantMemory.
    storeAtomicityLd:
     forall t a c d ld,
       getStreamIo getTransIo t stm = Some (a, c, d, Ld, ld) ->
-      (d = initData zero /\ ld = initData a /\
+      (ld = initData a /\
      forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
                                    ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi)) \/
     (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getTransIo tb stm = Some (a, cb, ld, St, ldb) /\
@@ -70,15 +70,34 @@ Section CreateInstantMemory.
                                 end)).
 End CreateInstantMemory.
 
-Section AllSa.
-  Variable stm: Stream InstantMemory initData.
-
 (*
-  Theorem stmSa: StoreAtomicity stm getImIo.
+Section AllSa.
+  Theorem stmSa: forall (stm: Stream InstantMemory initData), StoreAtomicity stm getImIo.
   Proof.
     constructor.
 
     induction t.
     intros.
-*)
+
+    unfold getStreamIo in *.
+    simpl in H.
+    assert (sth: fst (getStreamState 0 stm) = initData).
+    simpl.
+    destruct stm.
+    reflexivity.
+    destruct stm.
+    unfold getImIo in *.
+    destruct i.
+    destruct w.
+    injection H; intros.
+    rewrite H3, H2, H1, H0 in *.
+    simpl.
+    simpl.
+    destruct stm.
+    unfold getStreamS
+    assert (fst (match stm with
+                   | TCons s0 s' _ _ => (s0, s'
+    destruct stm.
+    simpl.
 End AllSa.
+*)
