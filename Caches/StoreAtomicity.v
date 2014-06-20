@@ -70,6 +70,7 @@ Section CreateInstantMemory.
                                 end)).
 End CreateInstantMemory.
 
+(*
 Section AllSa.
 
   Theorem memGood t:
