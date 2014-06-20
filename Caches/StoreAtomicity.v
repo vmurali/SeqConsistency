@@ -47,7 +47,7 @@ Section CreateInstantMemory.
    storeAtomicitySt:
    forall t a c d ld,
      getStreamIo getTransIo t stm = Some (a, c, d, St, ld) ->
-     ld = initData zero}.
+     ld = initData zero }.
 
   CoFixpoint buildIm n m: Stream InstantMemory m :=
   TCons _ (match getStreamIo getTransIo n stm as use
