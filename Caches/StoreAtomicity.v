@@ -26,19 +26,23 @@ Section CreateInstantMemory.
   Variable Trans: AllTransitions State.
   Variable initState: State.
   Variable stm: Stream Trans initState.
-  Variable getTransIo: forall s s', Trans s s' -> option (Addr * Cache * Data * Desc * Data). 
+  Variable getTransIo: forall s s',
+                         Trans s s' -> option (Addr * Proc * Data * Desc * Data). 
 
   Record StoreAtomicity := {
    storeAtomicityLd:
     forall t a c d ld,
       getStreamIo getTransIo t stm = Some (a, c, d, Ld, ld) ->
       (ld = initData a /\
-     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
-                                   ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi)) \/
-    (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getTransIo tb stm = Some (a, cb, ld, St, ldb) /\
-      forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
-                     ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi));
+     forall {ti}, 0 <= ti < t ->
+                  forall ci di ldi, defined ci ->
+                    ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb ldb, defined cb /\
+       tb < t /\
+       getStreamIo getTransIo tb stm = Some (a, cb, ld, St, ldb) /\
+       forall ti, tb < ti < t ->
+                  forall ci di ldi, defined ci ->
+                    ~ getStreamIo getTransIo ti stm = Some (a, ci, di, St, ldi));
 
    storeAtomicitySt:
    forall t a c d ld,
@@ -85,7 +89,6 @@ Section AllSa.
                    forall ci di ldi, defined ci ->
                                      ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
   Proof.
-    intros s stm.
     induction t.
     intros.
     simpl in *.
@@ -97,8 +100,27 @@ Section AllSa.
     simpl in *.
     destruct stm; simpl.
 
+    specialize (IHt _ stm a).
     destruct i; simpl in *.
     destruct w.
+
+    destruct IHt.
+
+    left.
+    constructor.
+    intuition.
+
+    destruct H as [u1 u2].
+    intros.
+    
+    intros.
+
+    specialize (IHt a).
+    destruct IHt.
+    constructor.
+    constructor.
+    specialize (IHt a); intuition.
+    
 
     specialize (IHt a).
     destruct (decAddr a0 a).
