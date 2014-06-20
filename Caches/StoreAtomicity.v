@@ -70,17 +70,86 @@ Section CreateInstantMemory.
                                 end)).
 End CreateInstantMemory.
 
-(*
 Section AllSa.
-  Theorem stmSa: forall (stm: Stream InstantMemory initData), StoreAtomicity stm getImIo.
-  Proof.
-    constructor.
 
+  Theorem memGood t:
+    forall s (stm: Stream InstantMemory s) a,
+      (fst (getStreamState t stm) a = s a /\
+                        forall ti, 0 <= ti < t ->
+                                   forall ci di ldi, defined ci ->
+                                                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
+      (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getImIo tb stm =
+                         Some (a, cb, fst (getStreamState t stm) a, St, ldb) /\
+        forall ti, tb < ti < t ->
+                   forall ci di ldi, defined ci ->
+                                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
+  Proof.
+    intros s stm.
+    induction t.
+    intros.
+    simpl in *.
+    destruct stm; simpl.
+    constructor; (reflexivity || intuition; assert False by omega; intuition).
+
+    intros.
+
+    simpl in *.
+    destruct stm; simpl.
+
+    destruct i; simpl in *.
+    destruct w.
+
+    specialize (IHt a).
+    destruct (decAddr a0 a).
+    rewrite e in *.
+
+    simpl in *.
+
+        getStreamIo getImIo t stm = Some (a, c, d, Ld, ld) -> Some (a, ci, di, St, ldi)
+      (ld = mem a /\
+     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+                                   ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getImIo tb stm = Some (a, cb, ld, St, ldb) /\
+      forall ti, tb < ti < t ->
+                   forall ci di ldi, defined ci ->
+                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
+  Proof.
+
+
+  Theorem storeAtomicityLd' t:
+    forall mem (stm: Stream InstantMemory mem) a c d ld,
+      getStreamIo getImIo t stm = Some (a, c, d, Ld, ld) ->
+      (ld = mem a /\
+     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+                                   ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getImIo tb stm = Some (a, cb, ld, St, ldb) /\
+      forall ti, tb < ti < t ->
+                   forall ci di ldi, defined ci ->
+                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
+  Proof.
     induction t.
     intros.
 
-    unfold getStreamIo in *.
-    simpl in H.
+    unfold getStreamIo, getImIo in *.
+    simpl in *.
+    destruct stm.
+    destruct i.
+    destruct w.
+    injection H; intros.
+    rewrite H3, H2, H1, H0 in *.
+    left.
+    constructor; intuition.
+    discriminate.
+    discriminate.
+
+    intros.
+    unfold getStreamIo, getImIo in *.
+    simpl in *.
+
+    destruct stm.
+    specialize (IHt s' stm a c d ld H).
+    unfold getStream
+    injection H; intros.
     assert (sth: fst (getStreamState 0 stm) = initData).
     simpl.
     destruct stm.
