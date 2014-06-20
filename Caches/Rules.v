@@ -384,6 +384,14 @@ Module mkDataTypes <: DataTypes.
 
   Definition oneBeh := Build_Behavior sys' init' trans'.
 
+  Definition getStreamCacheIo t := getCacheIo _ _ (trans oneBeh t).
+
+  Theorem sameThing t:
+    getStreamCacheIo t = getCacheIo _ _ (getStreamTransition t cstm).
+  Proof.
+    admit.
+  Qed.
+
   Fixpoint labelCh t ch src dst :=
     match t with
       | 0 => nil
@@ -604,6 +612,4 @@ Module mkDataTypes <: DataTypes.
   Definition send := mark.
   Definition proc := recv.
   Definition deq := recv.
-
-  Definition getStreamCacheIo t := getCacheIo _ _ (trans oneBeh t).
 End mkDataTypes.

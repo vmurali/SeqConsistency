@@ -13,7 +13,7 @@ Set Implicit Arguments.
 
 
   Theorem storeAtomicityLd':
-    forall a c d ld t,
+    forall t a c d ld,
       getStreamCacheIo t = Some (a, c, d, Ld, ld) ->
       (d = initData zero /\ ld = initData a /\
      forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
@@ -41,7 +41,7 @@ Set Implicit Arguments.
   Qed.
 
   Theorem storeAtomicitySt':
-    forall a c d ld t,
+    forall t a c d ld,
       getStreamCacheIo t = Some (a, c, d, St, ld) ->
       ld = initData zero.
   Proof.
@@ -52,15 +52,9 @@ Set Implicit Arguments.
     assumption.
   Qed.
 
-  Theorem sameThing t:
-    getStreamCacheIo t = getCacheIo _ _ (getStreamTransition t cstm).
-  Proof.
-    admit.
-  Qed.
-
   Theorem cacheIsStoreAtomic : StoreAtomicity cstm getCacheIo.
   Proof.
-    assert  (forall (a : Addr) (c : Tree) (d ld : Data) (t : Time),
+    assert  (forall (t: Time) (a : Addr) (c : Tree) (d ld : Data),
       getCacheIo _ _ (getStreamTransition t cstm) = Some (a, c, d, Ld, ld) ->
       d = initData zero /\
       ld = initData a /\
@@ -77,7 +71,7 @@ Set Implicit Arguments.
           forall (ci : Tree) (di ldi : Data),
           defined ci -> getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)))).
     intros.
-    pose proof (@storeAtomicityLd' a c d ld t).
+    pose proof (@storeAtomicityLd' t a c d ld).
     destruct H0.
     pose proof (sameThing t).
     rewrite H in H0.
@@ -106,7 +100,7 @@ Set Implicit Arguments.
     assumption.
     
 
-    assert (great: forall a c d ld t,
+    assert (great: forall t a c d ld,
       getCacheIo _ _ (getStreamTransition t cstm) = Some (a, c, d, St, ld) ->
       ld = initData zero).
 
@@ -114,7 +108,7 @@ Set Implicit Arguments.
 
     pose proof (sameThing t).
     rewrite <- H1 in H0.
-    pose proof (@storeAtomicitySt' a c d ld t H0).
+    pose proof (@storeAtomicitySt' t a c d ld H0).
     intuition.
 
     apply (Build_StoreAtomicity _ _ H great).

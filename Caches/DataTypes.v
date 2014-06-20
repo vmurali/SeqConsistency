@@ -53,6 +53,8 @@ Record Req := { desc: Desc;
 
 Parameter initData: Addr -> Data.
 
+Definition Proc := Cache.
+
 Module Type DataTypes.
   Parameter state: Cache -> Addr -> Time -> State.
   Parameter dir: Cache -> Cache -> Addr -> Time -> State.
