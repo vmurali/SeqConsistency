@@ -1,6 +1,5 @@
 Require Import Omega Useful Rules ChannelAxiom ChannelAxiomHelp Channel Coq.Logic.Classical MsiState DataTypes Tree HierProperties Cache.
 
-Opaque oneBeh.
 Module ch' := mkChannel.
 Module ch := mkChannelPerAddr mkDataTypes ch'.
 Module mkBehaviorAxioms: BehaviorAxioms mkDataTypes ch.
@@ -12,34 +11,34 @@ Module mkBehaviorAxioms: BehaviorAxioms mkDataTypes ch.
     Context {src dst: Cache}.
     Context {wt: Addr -> Time -> bool}.
     Context {wtS: Addr -> Time -> State}.
-Record CommonBehavior :=
-  {
-    change: forall {t a}, st a (S t) <> st a t -> (exists m, mark mch src dst a t m) \/
-                                                  (exists m, recv mch dst src a t m);
-    sendmChange: forall {t a m}, mark mch src dst a t m -> st a (S t) = to m;
-    recvmChange: forall {t a m}, recv mch dst src a t m -> st a (S t) = to m;
-    sendrImpSt: forall {t a r}, mark rch src dst a t r -> toRSComp (to r) (st a t);
+    Record CommonBehavior :=
+      {
+        change: forall {t a}, st a (S t) <> st a t -> (exists m, mark mch src dst a t m) \/
+                                                                                         (exists m, recv mch dst src a t m);
+        sendmChange: forall {t a m}, mark mch src dst a t m -> st a (S t) = to m;
+        recvmChange: forall {t a m}, recv mch dst src a t m -> st a (S t) = to m;
+        sendrImpSt: forall {t a r}, mark rch src dst a t r -> toRSComp (to r) (st a t);
 
-    sendrImpSetWait: forall {t a r}, mark rch src dst a t r -> wt a (S t) = true;
-    sendrImpSetWaitState: forall {t a r}, mark rch src dst a t r -> wtS a (S t) = to r;
-    sendrImpNoPrevWait: forall {t a r}, mark rch src dst a t r -> wt a t = false;
-    recvmImpResetWait: forall {t a m}, recv mch dst src a t m -> ~ toRSComp (wtS a t) (to m) ->
-    wt a (S t) = false;
-    wait0: forall a, wt a 0 = false;
-    waitSet: forall {t a}, wt a t = false -> wt a (S t) = true ->
-                           exists r, mark rch src dst a t r /\ toRSComp (to r) (st a t);
-    waitReset: forall {t a}, wt a t = true -> wt a (S t) = false ->
-                             exists m, recv mch dst src a t m /\
-                                       ~ toRSComp (wtS a t) (to m);
-    waitSSet: forall {t a}, wtS a (S t) <> wtS a t -> exists r, mark rch src dst a t r;
-    sendmFrom: forall {t a m}, mark mch src dst a t m -> from m = st a t;
-    sendrFrom: forall {t a r}, mark rch src dst a t r -> from r = st a t;
-    noSendmRecvm: forall {t a m}, mark mch src dst a t m ->
-                                  forall {m'}, recv mch dst src a t m' -> False;
-    noSendmSendr: forall {t a m}, mark mch src dst a t m ->
-                                  forall {r}, mark rch src dst a t r -> False;
-    noMarkrRecvm: forall {t a m r}, mark rch src dst a t r -> recv mch dst src a t m -> False
-  }.
+        sendrImpSetWait: forall {t a r}, mark rch src dst a t r -> wt a (S t) = true;
+        sendrImpSetWaitState: forall {t a r}, mark rch src dst a t r -> wtS a (S t) = to r;
+        sendrImpNoPrevWait: forall {t a r}, mark rch src dst a t r -> wt a t = false;
+        recvmImpResetWait: forall {t a m}, recv mch dst src a t m -> ~ toRSComp (wtS a t) (to m) ->
+                                           wt a (S t) = false;
+        wait0: forall a, wt a 0 = false;
+        waitSet: forall {t a}, wt a t = false -> wt a (S t) = true ->
+                               exists r, mark rch src dst a t r /\ toRSComp (to r) (st a t);
+        waitReset: forall {t a}, wt a t = true -> wt a (S t) = false ->
+                                 exists m, recv mch dst src a t m /\
+                                                ~ toRSComp (wtS a t) (to m);
+        waitSSet: forall {t a}, wtS a (S t) <> wtS a t -> exists r, mark rch src dst a t r;
+        sendmFrom: forall {t a m}, mark mch src dst a t m -> from m = st a t;
+        sendrFrom: forall {t a r}, mark rch src dst a t r -> from r = st a t;
+        noSendmRecvm: forall {t a m}, mark mch src dst a t m ->
+                                      forall {m'}, recv mch dst src a t m' -> False;
+        noSendmSendr: forall {t a m}, mark mch src dst a t m ->
+                                      forall {r}, mark rch src dst a t r -> False;
+        noMarkrRecvm: forall {t a m r}, mark rch src dst a t r -> recv mch dst src a t m -> False
+      }.
 
   End CommonBeh.
 
@@ -398,6 +397,8 @@ Record CommonBehavior :=
 
       intuition.
     Qed.
+
+    Opaque oneBeh.
 
     Theorem st_recvmImpResetWait: forall {t a m},
                                     recv mch p c a t m ->
@@ -929,6 +930,7 @@ Record CommonBehavior :=
       pose proof (slt_slei_false isSlt s); intuition.
     Qed.
 
+Opaque sys.
     Section Local2.
     Context {defp: defined p}.
     Context {defc: defined c}.
@@ -966,12 +968,14 @@ Record CommonBehavior :=
 
       intuition.
 
+
       simpl in *.
       right.
       destruct (decTree p p0).
       destruct (decTree c c0).
       destruct (decAddr a a0).
       pose proof (enqC2P p1 n) as H.
+      About m.
       fold m; fold m in H; fold a0.
       exists (Build_Mesg (fromB m) (toB m) a0 (dataBM m) (List.last (labelCh t mch c0 p0) 0)).
       simpl.

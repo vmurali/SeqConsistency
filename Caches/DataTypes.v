@@ -65,8 +65,6 @@ Module Type DataTypes.
   Parameter dwait: Cache -> Cache -> Addr -> Time -> bool.
   Parameter dwaitS: Cache -> Cache -> Addr -> Time -> State.
 
-  Parameter deqR: Addr -> Cache -> Index -> Time -> Prop.
-
   Parameter mark: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
   Parameter send: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
   Parameter recv: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
