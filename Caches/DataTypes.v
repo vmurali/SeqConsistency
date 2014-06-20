@@ -51,7 +51,6 @@ Record Req := { desc: Desc;
                 dataQ: Data
               }.
 
-Parameter reqFn: Addr -> Cache -> Index -> Req.
 Parameter initData: Addr -> Data.
 
 Module Type DataTypes.
@@ -70,6 +69,8 @@ Module Type DataTypes.
   Parameter recv: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
   Parameter proc: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
   Parameter deq: ChannelType -> Cache -> Cache -> Time -> Mesg -> Prop.
+
+  Parameter getStreamCacheIo: Time -> option (Addr * Cache * Data * Desc * Data).
 End DataTypes.
 
 

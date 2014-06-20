@@ -1,9 +1,8 @@
 Require Import Rules Channel DataTypes MsiState ChannelAxiomHelp.
 
-Opaque oneBeh.
-
 Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
   Import mkDataTypes ch.
+  Opaque oneBeh.
 
   Theorem toChild: forall {n a t p m},
                      defined n -> defined p ->
@@ -134,73 +133,36 @@ Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
     firstorder.
   Qed.
 
-  Theorem deqImpData: forall {a n t i}, defined n -> deqR a n i t -> desc (reqFn a n i) = St ->
-                                          data n a (S t) = dataQ (reqFn a n i).
-  Proof.
-    intros a n t i defn deqr isSt.
-    unfold deqR in *; unfold data.
-    destruct (trans oneBeh t).
-    destruct deqr as [e1 [eq reqI]].
-    rewrite <- e1, eq in *.
-    rewrite reqI in e.
-    rewrite e in isSt.
-    discriminate.
-    simpl.
-    destruct deqr as [e1 [seq reqi]].
-    destruct (decTree n c) as [eq | neq].
-    rewrite e1, seq in *.
-    rewrite reqi in *.
-    destruct (decAddr a a).
-    reflexivity.
-    firstorder.
-    assert (n = c) by auto; firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-    firstorder.
-  Qed.
-
   Theorem changeData:
     forall {n a t}, defined n ->
                     data n a (S t) <> data n a t ->
                     (exists m, (exists p, defined p /\ parent n p /\ recv mch p n a t m /\ from m = MsiState.In) \/
                                (exists c, defined c /\ parent c n /\ recv mch c n a t m /\
                                           slt Sh (from m))) \/
-                    exists i, deqR a n i t /\ desc (reqFn a n i) = St.
+                    getStreamCacheIo t = Some (a, n, data n a (S t), St, initData zero).
   Proof.
     intros n a t defn dtNeq.
-    unfold data in *; unfold recv in *; unfold deqR in *; unfold mkDataTypes.recv in *.
+    unfold data in *; unfold recv in *; unfold getStreamCacheIo in *; unfold mkDataTypes.recv in *.
     destruct (trans oneBeh t).
 
-    simpl in *. firstorder.
+    simpl in *; intuition.
 
     simpl in *.
     right.
     destruct (decTree n c).
     destruct (decAddr a a0).
-    rewrite e1, e2 in *.
-    exists (req (sys oneBeh t) a c).
-    firstorder; auto.
-    rewrite e2 in *.
-    firstorder.
-    rewrite e2 in *.
-    firstorder.
+    rewrite e0, e1 in *.
+    reflexivity.
+    intuition.
+    intuition.
 
-    simpl in *.
-    firstorder.
+    simpl in *; intuition.
 
-    simpl in *.
-    firstorder.
+    simpl in *; intuition.
 
-    simpl in *.
-    firstorder.
+    simpl in *; intuition.
 
-    simpl in *.
-    firstorder.
+    simpl in *; intuition.
 
     simpl in *.
     left.
@@ -214,11 +176,11 @@ Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
     rewrite <- nEq in *.
     destruct (decAddr a a0) as [aEq | aNeq].
     destruct (fromB m); intuition.
-    firstorder.
-    firstorder.
+    intuition.
+    intuition.
 
-    simpl in *; firstorder.
-    simpl in *; firstorder.
+    simpl in *; intuition.
+    simpl in *; intuition.
 
     simpl in *.
     left.
@@ -235,20 +197,47 @@ Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
     rewrite <- sth in sth2.
     rewrite sth2.
     destruct (fromB m); intuition.
-    firstorder.
-    firstorder.
+    intuition.
+    intuition.
 
-    simpl in *; firstorder.
-    simpl in *; firstorder.
+    simpl in *; intuition.
+    simpl in *; intuition.
   Qed.
 
-  Theorem deqImpNoSend: forall {c a i t},
-                          defined c -> deqR a c i t ->
+  Theorem deqImpData: forall {a n d ld t}, defined n ->
+                                            getStreamCacheIo t = Some (a, n, d, St, ld) ->
+                                            data n a (S t) = d /\ ld = initData zero.
+  Proof.
+    intros a n d ld t defn deqr.
+    unfold getStreamCacheIo, getCacheIo in *; unfold data.
+    destruct (trans oneBeh t); try discriminate; simpl.
+    injection deqr; intros.
+    destruct (decTree n c).
+    destruct (decAddr a a0).
+    intuition.
+    assert False by auto; intuition.
+    assert False by auto; intuition.
+  Qed.
+
+  Theorem deqLdImpData: forall {a n d ld t}, defined n ->
+                                        getStreamCacheIo t = Some (a, n, d, Ld, ld) ->
+                                        d = initData zero /\ ld = data n a t.
+  Proof.
+    intros a n d ld t defn deqr.
+    unfold getStreamCacheIo, getCacheIo in *; unfold data.
+    destruct (trans oneBeh t); try discriminate; simpl.
+    injection deqr; intros.
+    rewrite H2, H1 in *.
+    auto.
+  Qed.
+
+  Theorem deqImpNoSend: forall {c a d w ld t},
+                          defined c -> getStreamCacheIo t = Some (a, c, d, w, ld) ->
                           forall {m p}, defined p -> ~ mark mch c p a t m.
   Proof.
-    unfold not; intros c a i t defc deqr m p defp markm.
-    unfold deqR in *; unfold mark in *; unfold mkDataTypes.mark in *.
+    unfold not; intros c a d w ld t defc deqr m p defp markm.
+    unfold getStreamCacheIo, getCacheIo in *; unfold mark in *; unfold mkDataTypes.mark in *.
 
-    destruct (trans oneBeh t); firstorder.
+    destruct (trans oneBeh t); (solve [intuition]) || discriminate.
   Qed.
 End mkLatestValueAxioms.

@@ -604,4 +604,6 @@ Module mkDataTypes <: DataTypes.
   Definition send := mark.
   Definition proc := recv.
   Definition deq := recv.
+
+  Definition getStreamCacheIo t := getCacheIo _ _ (trans oneBeh t).
 End mkDataTypes.

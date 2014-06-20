@@ -975,7 +975,6 @@ Opaque sys.
       destruct (decTree c c0).
       destruct (decAddr a a0).
       pose proof (enqC2P p1 n) as H.
-      About m.
       fold m; fold m in H; fold a0.
       exists (Build_Mesg (fromB m) (toB m) a0 (dataBM m) (List.last (labelCh t mch c0 p0) 0)).
       simpl.

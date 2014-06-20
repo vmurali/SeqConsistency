@@ -5,37 +5,47 @@ Coq.Relations.Operators_Properties Coq.Relations.Relation_Operators List MsiStat
 Module Type LatestValueAxioms (dt: DataTypes) (ch: ChannelPerAddr dt).
   Import dt ch.
 
-  Axiom toChild: forall {n a t p m}, defined n -> defined p ->
-                   parent n p -> 
-                   mark mch p n a t m -> from m = MsiState.In -> dataM m = data p a t.
+  Axiom toChild: forall {n a t p m},
+                     defined n -> defined p ->
+                     parent n p -> 
+                     mark mch p n a t m -> from m = MsiState.In -> dataM m = data p a t.
+
   Axiom fromParent: forall {n a t p m}, defined n -> defined p ->
                       parent n p -> 
                       recv mch p n a t m -> from m = MsiState.In -> data n a (S t) = dataM m.
-  Axiom toParent: forall {n a t c m}, defined n -> defined c ->
-                     parent c n ->
-                     mark mch c n a t m -> slt Sh (from m) -> dataM m = data c a t.
-  Axiom fromChild: forall {n a t c m}, defined n -> defined c ->
-                     parent c n ->
-                     recv mch c n a t m -> slt Sh (from m) -> data n a (S t) = dataM m.
+
+  Axiom toParent: forall {n a t c m},
+                      defined n -> defined c ->
+                      parent c n ->
+                      mark mch c n a t m -> slt Sh (from m) -> dataM m = data c a t.
+
+  Axiom fromChild: forall {n a t c m},
+                       defined n -> defined c ->
+                       parent c n ->
+                       recv mch c n a t m -> slt Sh (from m) -> data n a (S t) = dataM m.
 
   Axiom initLatest: forall a, data hier a 0 = initData a /\ state hier a 0 = Mo.
 
-  Axiom deqImpData: forall {a n t i}, defined n -> deqR a n i t ->
-                                    desc (reqFn a n i) = St ->
-                                    data n a (S t) = dataQ (reqFn a n i).
-
   Axiom changeData:
     forall {n a t}, defined n ->
-      data n a (S t) <> data n a t ->
-      (exists m, (exists p, defined p /\ parent n p /\ recv mch p n a t m /\ from m = MsiState.In) \/
-                 (exists c, defined c /\ parent c n /\ recv mch c n a t m /\
-                            slt Sh (from m))) \/
-      exists i, deqR a n i t /\ desc (reqFn a n i) = St.
+                    data n a (S t) <> data n a t ->
+                    (exists m, (exists p, defined p /\ parent n p /\ recv mch p n a t m /\ from m = MsiState.In) \/
+                               (exists c, defined c /\ parent c n /\ recv mch c n a t m /\
+                                          slt Sh (from m))) \/
+                    getStreamCacheIo t = Some (a, n, data n a (S t), St, initData zero).
 
+  Axiom deqImpData: forall {a n d ld t}, defined n ->
+                                            getStreamCacheIo t = Some (a, n, d, St, ld) ->
+                                            data n a (S t) = d /\ ld = initData zero.
 
-  Axiom deqImpNoSend: forall {c a i t}, defined c -> deqR a c i t -> 
-                                      forall {m p}, defined p ->
-                                                    ~ mark mch c p a t m.
+  Axiom deqLdImpData: forall {a n d ld t}, defined n ->
+                                        getStreamCacheIo t = Some (a, n, d, Ld, ld) ->
+                                        d = initData zero /\ ld = data n a t.
+
+  Axiom deqImpNoSend: forall {c a d w ld t},
+                          defined c -> getStreamCacheIo t = Some (a, c, d, w, ld) ->
+                          forall {m p}, defined p -> ~ mark mch c p a t m.
+
 End LatestValueAxioms.
 
 Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorAxioms dt ch)
@@ -72,18 +82,17 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
   Theorem leafGood: forall {p n a t}, defined p -> defined n -> parent n p ->
                                       slt MsiState.In (dir p n a t) -> slt (state n a t) Mo ->
-                                      forall {c i}, 
+                                      forall {c d ld},
                                         defined c ->
-                                        deqR a c i t -> desc (reqFn a c i) = St ->
+                                        getStreamCacheIo t = Some (a, c, d, St, ld) ->
                                         False.
   Proof.
-    unfold not; intros p n a t defP defN n_p pGtI nLtM c i defC deqSt isSt.
+    unfold not; intros p n a t defP defN n_p pGtI nLtM c d ld defC deqSt.
     pose proof (deqLeaf deqSt) as leafC.
     pose proof (processDeq deqSt) as st; simpl in st.
     destruct (classic (descendent c p)) as [c_p | c_ne_p].
     destruct (classic (descendent c n)) as [c_n | c_ne_n].
     pose proof (@descSle c n defC defN c_n a t) as low.
-    rewrite isSt in st.
     rewrite st in low.
     apply (slt_slei_false nLtM low).
     pose proof (clos_rt_rtn1 Tree parent c p c_p) as trans.
@@ -100,7 +109,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     pose proof (compatible defP a t defY H) as [_ good].
     specialize (good n defN y_ne_n n_p).
     pose proof (@descSle c y defC defY c_y a t) as low.
-    rewrite isSt in st.
     rewrite st in low.
     pose proof (conservative defP defY H a t) as stuff.
     unfold sle in *; destruct (dir z y a t); destruct (dir z n a t); 
@@ -112,7 +120,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     firstorder.
     apply (parentLeafFalse leafC H).
     pose proof (@nonDescCompat c p defC defP c_ne_p sec a t) as contra.
-    rewrite isSt in st.
     rewrite st in contra.
     pose proof (compatible defP a t defN n_p) as [good _].
     destruct (dir p n a t); destruct (state p a t); unfold slt in *; unfold sle in *;
@@ -121,12 +128,12 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
   Theorem leafGood2: forall {p n a t}, defined p -> defined n -> parent n p ->
                                        forall {m}, mark mch p n a t m ->
-                                                   forall {c i}, 
+                                                   forall {c d ld},
                                                      defined c ->
-                                                     deqR a c i t -> desc (reqFn a c i) = St ->
+                                                     getStreamCacheIo t = Some (a, c, d, St, ld) ->
                                                      False.
   Proof.
-    unfold not; intros p n a t defP defN n_p m markm c i defC deqSt isSt.
+    unfold not; intros p n a t defP defN n_p m markm c d ld defC deqSt.
     pose proof (pSendUpgrade defP defN n_p markm) as dir_n_lt_M.
     pose proof (sendCCond defP defN n_p markm) as [st_hg othersCompat].
     pose proof (sendmChange (dt defP defN n_p) markm) as rew.
@@ -137,7 +144,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     destruct (classic (descendent c n)) as [c_n | c_ne_n].
     pose proof (@descSle c n defC defN c_n a t) as low.
     pose proof (conservative defP defN n_p a t) as sth.
-    rewrite isSt in st.
     rewrite st in *.
     destruct (state n a t); destruct (dir p n a t); destruct (dir p n a (S t));
     unfold sle in *; unfold slt in *; auto.
@@ -155,7 +161,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     specialize (othersCompat y defY y_ne_n H).
     pose proof (@descSle c y defC defY c_y a t) as low.
     pose proof (conservative defP defY H a t) as stuff.
-    rewrite isSt in st.
     rewrite st in *.
     unfold sle in *; unfold slt in *; destruct (dir z n a (S t)); destruct (dir z n a t);
     destruct (dir z y a t); destruct (state y a t); auto.
@@ -166,7 +171,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     firstorder.
     apply (parentLeafFalse leafC H).
     pose proof (@nonDescCompat c p defC defP c_ne_p sec a t) as contra.
-    rewrite isSt in st.
     rewrite st in contra.
     unfold sle in *; unfold slt in *; destruct (dir p n a t); destruct (dir p n a (S t));
     destruct (state p a t); auto.
@@ -174,12 +178,12 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
   Theorem leafGood3: forall {p n a t}, defined p -> defined n -> parent n p ->
                                        forall {m}, mark mch n p a t m ->
-                                                   forall {c i}, 
+                                                   forall {c d ld},
                                                      defined c ->
-                                                     deqR a c i t -> desc (reqFn a c i) = St ->
+                                                     getStreamCacheIo t = Some (a, c, d, St, ld) ->
                                                      False.
   Proof.
-    unfold not; intros p n a t defP defN n_p m markm c i defC deqSt isSt.
+    unfold not; intros p n a t defP defN n_p m markm c d ld defC deqSt.
     destruct (classic (c = n)) as [eq|notEq].
     rewrite eq in *.
     apply (deqImpNoSend defN deqSt defP markm).
@@ -190,7 +194,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     pose proof (sendmChange (st defP defN n_p) markm) as stEq.
     rewrite stEq in dgd.
     pose proof (processDeq deqSt) as eqSth; simpl in *.
-    rewrite isSt in eqSth.
     rewrite eqSth in *.
     destruct (state n a t); destruct (to m); unfold slt in *; unfold sle in *; auto.
     assert (n_no_c: ~ descendent n c).
@@ -205,7 +208,6 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     pose proof (@nonDescCompat n c defN defC n_no_c c_no_n a t) as stNow.
     pose proof (cSendDowngrade defP defN n_p markm) as dgd.
     pose proof (processDeq deqSt) as eqSth; simpl in *;
-    rewrite isSt in eqSth.
     rewrite eqSth in *.
     unfold sle in *; unfold slt in *; destruct (state n a t); destruct (state n a (S t));
     auto.
@@ -216,40 +218,20 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
                     sle Sh (state n a t) ->
                     (forall {c}, defined c -> parent c n -> sle (dir n c a t) Sh) ->
                     (data n a t = initData a /\
-                     forall {ti}, 0 <= ti < t ->
-                                  forall {ci ii}, defined ci ->
-                                                  ~ (deqR a ci ii ti /\
-                                                     desc (reqFn a ci ii) = St)) \/
-    (exists cb ib tb, defined cb /\ tb < t /\ deqR a cb ib tb /\ desc (reqFn a cb ib) = St /\
-                      data n a t = dataQ (reqFn a cb ib) /\
-                      forall {ti}, tb < ti < t ->
-                                   forall {ci ii},
-                                     defined ci ->
-                                     ~ (deqR a ci ii ti /\
-                                        desc (reqFn a ci ii) = St)
-    ).
+                    forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+                                   ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, data n a t, St, initData zero) /\
+      forall ti, tb < ti < t ->
+                   forall ci di ldi, defined ci ->
+                     ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
     Proof.
-      intros a.
-      pose (fun t => forall n,
-              defined n ->
-                    sle Sh (state n a t) ->
-                    (forall {c}, defined c -> parent c n -> sle (dir n c a t) Sh) ->
-                    (data n a t = initData a /\
-                     forall {ti}, 0 <= ti < t ->
-                                  forall {ci ii}, defined ci ->
-                                                  ~ (deqR a ci ii ti /\
-                                                     desc (reqFn a ci ii) = St)) \/
-    (exists cb ib tb, defined cb /\ tb < t /\ deqR a cb ib tb /\ desc (reqFn a cb ib) = St /\
-                      data n a t = dataQ (reqFn a cb ib) /\
-                      forall {ti}, tb < ti < t ->
-                                   forall {ci ii},
-                                     defined ci ->
-                                     ~ (deqR a ci ii ti /\
-                                        desc (reqFn a ci ii) = St)
-           )) as P.
+      intros a t.
       pose proof (initLatest a) as [hierInit hierM].
-      apply (@ind P).
-      unfold P in *; clear P.
+      assert (ind: forall t, forall P: nat -> Type, P 0 -> (forall t, 
+                                                              (forall ti, ti <= t -> P ti) -> P (S t)) ->
+                                                    P t) by (intros; apply @ind; intuition).
+      apply (ind t).
+      clear ind.
       intros n defN stCond dirCond.
       destruct (classic (n = hier)) as [eq|notEq].
       rewrite eq.
@@ -275,7 +257,8 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       rewrite dir0 in sleUse.
       unfold sle in *; destruct (state n a 0); destruct (state y a 0); firstorder.
 
-      unfold P in *; clear P.
+      clear ind.
+      clear t.
       intros t SIHt n defN condSt condDir.
 
       destruct (classic (sle Sh (state n a t) /\
@@ -308,47 +291,40 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
 
       assert (noStore: forall co, defined co ->
-                                  co <> n -> forall i,
-                                               ~ (deqR a co i t /\
-                                                  desc (reqFn a co i) = St
-             )).
-      unfold not; intros co defCo co_ne_n i [deqSt isSt].
+                                  co <> n -> forall d ld,
+                                               ~ (getStreamCacheIo t = Some (a, co, d, St, ld))).
+      unfold not; intros co defCo co_ne_n d ld deqSt.
       pose proof (deqLeaf deqSt) as leafCo.
       specialize (noneElse co defCo leafCo co_ne_n).
       pose proof (processDeq deqSt) as use; simpl in use.
-      rewrite isSt in use.
       rewrite use in noneElse; unfold sle in *; auto.
 
 
-      destruct (classic (exists i, deqR a n i t /\ 
-               desc (reqFn a n i) = St)) as [[i [deqSt isSt]] | noNStore].
+      destruct (classic (exists d ld, getStreamCacheIo t = Some (a, n, d, St, ld))) as [[d [ld deqSt]] | noNStore].
 
-      pose proof (deqImpData defN deqSt) as st.
-      rewrite isSt in st.
-      rewrite st.
       assert (triv: t < S t) by omega.
       assert (triv2: forall ti, t < ti < S t -> False) by (intros ti cond; omega).
+      pose proof (deqImpData defN deqSt) as [st1 st2].
+      rewrite st1, <- st2.
       right.
-      exists n; exists i; exists t.
-      generalize defN triv deqSt isSt st triv2; clear; firstorder.
-      reflexivity.
+      exists n; exists t.
+      generalize defN triv deqSt triv2; clear; firstorder.
 
 
-      assert (good: forall c i, defined c ->
-                                ~ (deqR a c i t /\ 
-                                   desc (reqFn a c i) = St)).
-      unfold not. intros c i defC [deqc isSt].
+      assert (good: forall c d ld, defined c ->
+                                   ~ getStreamCacheIo t = Some (a, c, d, St, ld)).
+      unfold not. intros c d ld defC deqc.
       destruct (classic (c = n)) as [eq|notEq].
-      rewrite eq in *; generalize noNStore deqc isSt; clear; firstorder.
-      generalize noStore defC notEq deqc isSt; clear; firstorder.
+      rewrite eq in *; generalize noNStore deqc; clear; firstorder.
+      generalize noStore defC notEq deqc; clear; firstorder.
 
 
       destruct (classic (data n a (S t) = data n a t)) as [dataEq| dataNeq].
       rewrite dataEq.
 
-      destruct SIHt as [[initi condInit]|[resti condResti]].
+      destruct SIHt as [[initi condInit]|[cb condResti]].
       left.
-      constructor. assumption.
+      constructor. auto.
       intros ti cond.
       assert (cases: 0 <= ti < t \/ ti = t) by omega.
       destruct cases as [ind|rew].
@@ -357,16 +333,12 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       rewrite rew.
       assumption.
 
-      destruct condResti as [ib [tb [defCb [tb_lt_t [deqSt [isSt [dEq rest]]]]]]].
+      destruct condResti as [tb [defCb [tb_lt_t [deqSt rest]]]].
       right.
-      exists resti; exists ib; exists tb.
+      exists cb; exists tb.
       constructor. assumption.
       constructor.
       omega.
-      constructor.
-      assumption.
-      constructor.
-      assumption.
       constructor.
       assumption.
       intros ti cond.
@@ -433,20 +405,19 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
                                                 apply (cLow ts H)).
 
       assert (noDeq1: forall t0, ts < t0 <= t ->
-                                 forall c i, defined c -> ~ (deqR a c i t0
-                                                            /\ 
-                                                            desc (reqFn a c i) = St)).
+                                 forall c d ld, defined c ->
+                                                ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
       intros t0 cond.
       specialize (pHigh t0 cond).
       specialize (cLow1 t0 cond).
       pose proof (@leafGood p n a t0 defP defN n_p pHigh cLow1) as H.
-      generalize H; clear; firstorder.
+      assumption.
 
       pose proof (@leafGood2 p n a ts defP defN n_p m markm) as noDeq2.
 
       assert (goodT: forall t0, ts <= t0 <= t ->
-                                forall c i, defined c -> ~ (deqR a c i t0 /\
-                                                            desc (reqFn a c i) = St)).
+                                forall c d ld, defined c ->
+                                               ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
       intros t0 cond.
       assert (H: ts < t0 <= t \/ t0 = ts) by omega.
       destruct H as [c1|c2].
@@ -499,12 +470,10 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
 
 
       right.
-      destruct condRest as [ib [tb [defCb [tb_lt_ts [deqSt [isSt [dtEq rest]]]]]]].
-      exists resti; exists ib; exists tb.
+      destruct condRest as [tb [defCb [tb_lt_ts [deqSt rest]]]].
+      exists resti; exists tb.
       constructor. assumption. constructor.
       assert (tb < S t) by omega. assumption.
-      constructor. assumption.
-      constructor. assumption.
       constructor. assumption.
       intros ti cond; assert (H: tb < ti < ts \/ ts <= ti <= t) by omega;
       destruct H as [ind|tough].
@@ -549,20 +518,20 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
                                                 apply (pHigh ts H)).
 
       assert (noDeq1: forall t0, ts < t0 <= t ->
-                                 forall c i, defined c -> ~ (deqR a c i t0 /\
-                                                             desc (reqFn a c i) = St)).
+                                 forall c d ld, defined c ->
+                                             ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
       intros t0 cond.
       specialize (cLow t0 cond).
       specialize (pHigh1 t0 cond).
       pose proof (@leafGood n c a t0 defN defC c_n pHigh1 cLow) as H.
-      generalize H; clear; firstorder.
+      generalize H; clear; intuition.
 
 
       pose proof (@leafGood3 n c a ts defN defC c_n m markm) as noDeq2.
 
       assert (goodT: forall t0, ts <= t0 <= t ->
-                                forall c i, defined c -> ~ (deqR a c i t0 /\
-                                                            desc (reqFn a c i) = St)).
+                                forall c d ld, defined c ->
+                                            ~ getStreamCacheIo t0 = Some (a, c, d, St, ld)).
       intros t0 cond.
       assert (H: ts < t0 <= t \/ t0 = ts) by omega.
       destruct H as [c1|c2].
@@ -608,12 +577,10 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
       apply (goodT ti tough).
 
       right.
-      destruct condRest as [ib [tb [defCb [tb_lt_ts [deqSt [isSt [dtEq rest]]]]]]].
-      exists resti; exists ib; exists tb.
+      destruct condRest as [tb [defCb [tb_lt_ts [deqSt rest]]]].
+      exists resti; exists tb.
       constructor. assumption. constructor.
       assert (tb < S t) by omega. assumption.
-      constructor. assumption.
-      constructor. assumption.
       constructor. assumption.
       intros ti cond; assert (H: tb < ti < ts \/ ts <= ti <= t) by omega;
      destruct H as [ind|tough].
@@ -637,25 +604,19 @@ Module LatestValueTheorems (dt: DataTypes) (ch: ChannelPerAddr dt) (c: BehaviorA
     Qed.
 
   Theorem latestValue:
-  forall {c a t},
+  forall a c t,
     defined c ->
     leaf c ->
     sle Sh (state c a t) ->
     (data c a t = initData a /\
-     forall {ti}, 0 <= ti < t -> forall {ci ii},
-                                   defined ci ->
-                                   ~ (deqR a ci ii ti /\
-                                      desc (reqFn a ci ii) = St)) \/
-    (exists cb ib tb, defined cb /\ tb < t /\ deqR a cb ib tb /\ desc (reqFn a cb ib) = St /\
-                      data c a t = dataQ (reqFn a cb ib) /\
-                      forall {ti}, tb < ti < t ->
-                                   forall {ci ii},
-                                     defined ci ->
-                                     ~ (deqR a ci ii ti /\
-                                        desc (reqFn a ci ii) = St)
-    ).
+     forall {ti}, 0 <= ti < t -> forall ci di ldi, defined ci ->
+                                   ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb, defined cb /\ tb < t /\ getStreamCacheIo tb = Some (a, cb, data c a t, St, initData zero) /\
+      forall ti, tb < ti < t ->
+                   forall ci di ldi, defined ci ->
+                     ~ getStreamCacheIo ti = Some (a, ci, di, St, ldi)).
   Proof.
-    intros c a t cDef leafC more.
+    intros a c t cDef leafC more.
     assert (cond: forall {c'}, defined c' -> parent c' c -> sle (dir c c' a t) Sh).
     intros c' defC' c'_c; unfold leaf in *; unfold parent in *.
     destruct c.
