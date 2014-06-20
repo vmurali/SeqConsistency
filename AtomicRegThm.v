@@ -20,3 +20,23 @@ Section ForAddr.
     assumption.
   Qed.
 End ForAddr.
+
+Section InstantMemory.
+  Variable reqFn: Addr -> Cache -> Index -> Req.
+
+  Inductive InstantMem: (Addr -> Data) -> (Addr -> Data) -> Set :=
+  | IReq: forall m a (p: Proc) d (w: Desc),
+            InstantMem m (fun a' => 
+                            if w
+                            then m a'
+                            else 
+                              if decAddr a a'
+                              then d
+                              else m a')
+  | IIdle: forall m, InstantMem m m.
+
+  Theorem instSimulateAtomic:
+    forall sa (sas: Stream TransA sa),
+    exists sb (sbs: Stream TransB sb),
+      forall n,
+        getStreamIo getTransAIo n sas = getStreamIo getTransBIo n sbs.

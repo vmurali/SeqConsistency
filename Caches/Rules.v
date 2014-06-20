@@ -380,8 +380,6 @@ Module mkDataTypes <: DataTypes.
     rewrite H in H0.
     assumption.
   Defined.
-  Opaque sys' init' trans'.
-
   Definition oneBeh := Build_Behavior sys' init' trans'.
 
   Definition getStreamCacheIo t := getCacheIo _ _ (trans oneBeh t).
@@ -389,7 +387,10 @@ Module mkDataTypes <: DataTypes.
   Theorem sameThing t:
     getStreamCacheIo t = getCacheIo _ _ (getStreamTransition t cstm).
   Proof.
-    admit.
+    unfold getStreamCacheIo, getCacheIo,
+    trans, sys, oneBeh, sys', trans', eq_rec, eq_rect in *.
+    destruct (stateNSndStateSnFst t cstm).
+    reflexivity.
   Qed.
 
   Fixpoint labelCh t ch src dst :=

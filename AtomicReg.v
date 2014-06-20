@@ -14,12 +14,14 @@ Section ForAddr.
 
   Variable sa: StoreAtomicity reqFn respFn.
 
-  Definition AtomicList := TransList (AtomicTrans reqFn) (Build_State initData (fun a t => 0)).
+  Definition AtomicList := TransList (AtomicTrans) (Build_State initData (fun a t => 0)).
 
   Definition getTransNext n s (al: AtomicList n s) :=
     match respFn n with
-      | Some r => Build_NextTrans _ _ _ (AReq reqFn s (addrR r) (procR r))
-      | None => Build_NextTrans _ _ _ (Idle reqFn s)
+      | Some (Build_Resp a c i ld) =>
+        Build_NextTrans _ _ _
+                        (AReq s a c (dataQ (reqFn a c i)) (desc (reqFn a c i)))
+      | None => Build_NextTrans _ _ _ (Idle s)
     end.
 
   Lemma nextLe a t c: next (getTransSt getTransNext t) a c <=
@@ -45,7 +47,7 @@ Section ForAddr.
   Qed.
 
   Lemma reqImpGt t: match getTrans getTransNext t with
-                      | AReq a c => S (next (getTransSt getTransNext t) a c) =
+                      | AReq a c _ _ => S (next (getTransSt getTransNext t) a c) =
                                  next (getTransSt getTransNext (S t)) a c /\
                                  forall a' c', (a' <> a \/ c' <> c) ->
                                             next (getTransSt getTransNext t ) a' c' =
@@ -75,7 +77,7 @@ Section ForAddr.
   Theorem uniqAtomLabels:
     forall t1 t2,
       match getTrans getTransNext t1, getTrans getTransNext t2 with
-        | AReq a1 c1, AReq a2 c2 =>
+        | AReq a1 c1 _ _ , AReq a2 c2 _ _ =>
           a1 = a2 ->
           c1 = c2 ->
           next (getTransSt getTransNext t1) a1 c1 =
@@ -110,7 +112,7 @@ Section ForAddr.
 
   Theorem localAtomOrdering:
     forall t1 t2, match getTrans getTransNext t1, getTrans getTransNext t2 with
-                    | AReq a1 c1, AReq a2 c2 =>
+                    | AReq a1 c1 _ _, AReq a2 c2 _ _ =>
                       a1 = a2 ->
                       c1 = c2 ->
                       next (getTransSt getTransNext t1) a1 c1 <
@@ -141,7 +143,7 @@ Section ForAddr.
   Theorem allAtomPrev a t c i:
     next (getTransSt getTransNext t) a c > i ->
     exists t', t' < t /\ match getTrans getTransNext t' with
-                           | AReq a' c' => a = a' /\ c = c' /\
+                           | AReq a' c' _ _ => a = a' /\ c = c' /\
                                        next (getTransSt getTransNext t') a' c' = i
                            | Idle => False
                          end.
@@ -201,11 +203,9 @@ Section ForAddr.
 
   Definition noCurrAtomStore a t :=
     match getTrans getTransNext t with
-      | AReq a' c' =>
+      | AReq a' c' d w =>
         a = a' ->
-        let (descQ', dtQ') :=
-            reqFn a' c' (next (getTransSt getTransNext t) a' c') in
-          descQ' = St -> False
+          w = St -> False
       | _ => True
     end.
 
