@@ -78,16 +78,19 @@ Section AllSa.
 
   Theorem memGood t:
     forall s (stm: Stream InstantMemory s) a,
-      (fst (getStreamState t stm) a = s a /\
-                        forall ti, 0 <= ti < t ->
-                                   forall ci di ldi,
-                                                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
-      (exists cb tb ldb, tb < t /\ getStreamIo getImIo tb stm =
-                         Some (a, cb, fst (getStreamState t stm) a, St, ldb) /\
-        forall ti, tb < ti < t ->
-                   forall ci di ldi,
-                                     ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
+    (forall ti,
+       0 <= ti < t ->
+       forall ci di ldi,
+         ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
+    (exists cb tb ldb,
+       tb < t /\
+       getStreamIo getImIo tb stm =
+       Some (a, cb, fst (getStreamState tb stm) a, St, ldb) /\
+       forall ti, tb < ti < t ->
+                  forall ci di ldi,
+                    ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
   Proof.
+    unfold getStreamIo in *.
     induction t.
     intros.
     simpl in *.
@@ -99,35 +102,50 @@ Section AllSa.
     simpl in *.
     destruct stm; simpl.
 
-    destruct i; simpl in *.
+    destruct i; intros; simpl in *.
     destruct w.
 
     destruct (IHt _ stm a) as [nopast|past].
 
-    left;
-      constructor;
-      [intuition | 
-       intros;
-         match goal with
-           | H: 0 <= ?ti < S ?t |- _ =>
-               destruct ti;
-               unfold getStreamIo in *; simpl in *;
-                      [discriminate | assert (0 <= ti < t) by omega;
-                                        match goal with
-                                          | nopast: _ /\ _ |- _ =>
-                                              destruct nopast as [_ nopast];
-                                              apply nopast; intuition
-                                        end]
-         end].
-    right.
+    left; intros; destruct ti; simpl in *.
+    discriminate.
+    assert (0 <= ti < t) by omega;
+      apply (nopast); intuition.
+
+    right; intros.
     match goal with
       | H: exists cb tb ld, _ |- _ =>
           destruct H as [cb [tb [ldb [eq1 [eq2 rest]]]]];
           exists cb, (S tb), ld
     end.
+    constructor; (omega || intuition).
+
+    destruct ti.
+    omega.
+    simpl in H.
+    assert (tb < ti < t) by omega.
+    apply (rest (ti) H2 ci di ldi H).
+
+    specialize (IHt _ stm a).
+
+    destruct (decAddr a0 a).
+    rewrite <- e in *.
+
+    right; intros.
+    exists p, 0, (initData zero).
     constructor.
     omega.
-    constructor.
+    simpl.
+
+as [nopast|past].
+
+    
+    intros.
+
+    intuition.
+    pose proof (nextStmEq ti stm).
+    simpl in H.
+    simpl in *.
     unfold getStreamIo in *; intuition.
     intros.
     destruct ti;
