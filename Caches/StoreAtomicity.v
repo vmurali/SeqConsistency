@@ -1,4 +1,4 @@
-Require Import DataTypes Transitions.
+Require Import DataTypes Transitions Useful.
 
 Set Implicit Arguments.
 
@@ -74,19 +74,18 @@ Section CreateInstantMemory.
                                 end)).
 End CreateInstantMemory.
 
-(*
 Section AllSa.
 
   Theorem memGood t:
     forall s (stm: Stream InstantMemory s) a,
       (fst (getStreamState t stm) a = s a /\
                         forall ti, 0 <= ti < t ->
-                                   forall ci di ldi, defined ci ->
+                                   forall ci di ldi,
                                                      ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)) \/
-      (exists cb tb ldb, defined cb /\ tb < t /\ getStreamIo getImIo tb stm =
+      (exists cb tb ldb, tb < t /\ getStreamIo getImIo tb stm =
                          Some (a, cb, fst (getStreamState t stm) a, St, ldb) /\
         forall ti, tb < ti < t ->
-                   forall ci di ldi, defined ci ->
+                   forall ci di ldi,
                                      ~ getStreamIo getImIo ti stm = Some (a, ci, di, St, ldi)).
   Proof.
     induction t.
@@ -100,18 +99,82 @@ Section AllSa.
     simpl in *.
     destruct stm; simpl.
 
-    specialize (IHt _ stm a).
     destruct i; simpl in *.
     destruct w.
 
-    destruct IHt.
+    destruct (IHt _ stm a) as [nopast|past].
 
-    left.
+    left;
+      constructor;
+      [intuition | 
+       intros;
+         match goal with
+           | H: 0 <= ?ti < S ?t |- _ =>
+               destruct ti;
+               unfold getStreamIo in *; simpl in *;
+                      [discriminate | assert (0 <= ti < t) by omega;
+                                        match goal with
+                                          | nopast: _ /\ _ |- _ =>
+                                              destruct nopast as [_ nopast];
+                                              apply nopast; intuition
+                                        end]
+         end].
+    right.
+    match goal with
+      | H: exists cb tb ld, _ |- _ =>
+          destruct H as [cb [tb [ldb [eq1 [eq2 rest]]]]];
+          exists cb, (S tb), ld
+    end.
     constructor.
-    intuition.
-
-    destruct H as [u1 u2].
+    omega.
+    constructor.
+    unfold getStreamIo in *; intuition.
     intros.
+    destruct ti;
+      unfold getStreamIo in *; simpl in *;
+             [discriminate | assert (tb < ti < t) by omega].
+    apply (rest ti H0 ci di ldi).
+
+    specialize (IHt _ stm a).
+
+    destruct (decAddr a0 a).
+    rewrite e in *.
+                               match goal with
+                                 | nopast: _ /\ _ |- _ =>
+                                     destruct nopast as [_ nopast];
+                                     apply nopast; intuition
+                               end].
+    assert (S tb < S t
+    simpl.
+
+    
+
+    destruct tb;
+      unfold getStreamIo in *; simpl in *.
+    destruct stm; simpl in *.
+             [discriminate | intuition].
+    unfold getStreamIo in *; discriminate.
+
+    unfold getStreamIo in *; simpl.
+    assert (0 <= ti < t) by omega.
+    destruct H as [_ u2].
+
+    apply (u2 _ H1 ci di ldi).
+    simpl in *; discriminate.
+    simpl in *.
+    destruct opts.
+    rewrite H0.
+    simpl.
+    intros; discriminate.
+    simpl.
+    simpl.
+    assert (0 <= 
+    specialize (u2
+    unfold getStreamTransition.
+    simpl.
+    About getStreamTransition.
+    simpl.
+    
     
     intros.
 

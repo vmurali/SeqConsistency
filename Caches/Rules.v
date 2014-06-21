@@ -376,7 +376,7 @@ Module mkDataTypes <: DataTypes.
   Theorem trans' t: Transition (sys' t) (sys' (S t)).
   Proof.
     pose proof (stateNSndStateSnFst t cstm).
-    pose proof (getStreamTransition t cstm).
+    pose proof (getStreamTransition cstm t).
     rewrite H in H0.
     assumption.
   Defined.
@@ -385,7 +385,7 @@ Module mkDataTypes <: DataTypes.
   Definition getStreamCacheIo t := getCacheIo _ _ (trans oneBeh t).
 
   Theorem sameThing t:
-    getStreamCacheIo t = getCacheIo _ _ (getStreamTransition t cstm).
+    getStreamCacheIo t = getCacheIo _ _ (getStreamTransition cstm t).
   Proof.
     unfold getStreamCacheIo, getCacheIo,
     trans, sys, oneBeh, sys', trans', eq_rec, eq_rect in *.
