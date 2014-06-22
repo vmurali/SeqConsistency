@@ -48,8 +48,8 @@ Section CreateInstantMemory.
      getStreamIo getTransIo t stm = Some (a, c, d, St, ld) ->
      ld = initData zero }.
 
-  Fixpoint getNStateForStm n :=
-    match n with
+  Fixpoint getNStateForStm x :=
+    match x with
       | 0 => initData
       | S m => match getStreamIo getTransIo m stm with
                  | Some (a, c, d, w, ld) => if w
@@ -62,111 +62,75 @@ Section CreateInstantMemory.
                end
     end.
 
-  Program Definition getNTransForStm n:
-    InstantMemory (getNStateForStm n) (getNStateForStm (S n)) :=
-    match getStreamIo getTransIo n stm as io
-          return match io with
-                   | Some (a, c, d, w, ld) => InstantMemory (getNStateForStm n)
-
-with
-      | Some (a, c, d, w, ld) => IReq (getNStateForStm n) a c d w
-      | None => IIdle (getNStateForStm n)
-    end.
-
-  Print getNTransForStm.
-
-  Print Stream.
-  Program CoFixpoint buildIm n: Stream InstantMemory (getNStateForStm n) :=
-    TCons (getNStateForStm n)
-          (match getStreamIo getTransIo n stm
+  CoFixpoint buildIm n: Stream InstantMemory (getNStateForStm n) :=
+    TCons _
+          (match getStreamIo getTransIo n stm as io return InstantMemory (getNStateForStm n)
+              match io with
+                | Some (a, c, d, w, ld) => if w
+                                           then getNStateForStm n
+                                           else fun a' => if decAddr a a'
+                                                          then d
+                                                          else (getNStateForStm n) a'
+                | None => getNStateForStm n
+              end
              with
                | Some (a, c, d, w, ld) => IReq (getNStateForStm n) a c d w
                | None => IIdle (getNStateForStm n)
-             end) (eq_rect_r _ (buildIm (S n)) _).
+             end) (eq_rect_r _ (buildIm (S n)) eq_refl).
 
-  Next Obligation.
-    admit.
-  Qed.
-  Next Obligation.
-    destruct (getStreamIo getTransIo n stm).
-    destruct p3, p3, p3, p3.
-    induction n.
-    simpl in *.
-    unfold getNStateForStm.
 
-  TCons _ (match getStreamIo getTransIo n stm as use
-              return (InstantMemory m match use with
-                                        | Some (a, _, d, w, _) => if w
-                                                                  then m
-                                                                  else fun a' =>
-                                                                         if decAddr a a'
-                                                                         then d
-                                                                         else m a'
-                                        | None => m
-                                      end) with
-             | Some (a, c, d, w, ld) => (IReq m a c d w)
-             | None => (IIdle m)
-           end) (buildIm (S n) (match getStreamIo getTransIo n stm as use
-                                   return (Addr -> Data) with
-                                  | Some (a, c, d, w, ld) => if w
-                                                             then m
-                                                             else fun a' =>
-                                                                    if decAddr a a'
-                                                                    then d
-                                                                    else m a'
-                                  | None => m
-                                end)).
-
-  Theorem distrBuildIm n:
-    forall m mem,
-      getStreamIo getImIo n (buildIm m mem) = getStreamIo getImIo 0 (buildIm (n+m) mem).
+  Theorem buildImSth n:
+    forall m a c d w ld,
+      getStreamIo getTransIo (m+n) stm = Some (a, c, d, w, ld) ->
+      getStreamIo getImIo m (buildIm n) = Some (a, c, d, w, if w
+                                                            then getNStateForStm (m+n) a
+                                                            else initData zero).
   Proof.
+    unfold getStreamIo, getImIo.
     induction n.
     intros.
-    assert (0+m = m) by omega.
-    rewrite H.
-    reflexivity.
+    assert (H2: m+0 = m) by omega; rewrite H2 in *; clear H2.
+    simpl in *.
+    unfold getStreamIo in *.
+    destruct (getStreamTransition (buildIm 0) m).
+    destruct (getTransIo (getStreamTransition stm m)).
+    destruct p, p, p, p.
+    injection H; intros.
+    repeat f_equal; subst; intuition.
+    discriminate.
+
     intros.
-    simpl.
-    unfold getStreamIo at 1.
-    unfold getImIo at 1.
-    unfold getStreamTransition at 1.
-    simpl.
-    
-    unfold getStreamIo at 5.
-    unfold buildIm
+    assert (H0: S m + n = m + S n) by omega.
+    specialize (IHn (S m) a c d w ld).
+    rewrite H0 in *.
+    rewrite H in *.
+    assert (K: Some (a, c,d,w,ld) = Some (a,c,d,w,ld)) by reflexivity.
+    specialize (IHn K).
     simpl in *.
-    assert (S m + n = m + S n) by omega.
-    unfold getStreamIo in IHn at 1.
     simpl in *.
-    specialize (IHn (S m)).
-    rewrite <- H in *.
-    simpl in *.
-    destruct (getStreamIo getTransIo n stm).
-    unfold buildIm in IHn at 3.
+    rewrite H1, H4 in *.
+    reflexivity.
+    auto
+      match getStreamIo getTransIo (m+n) stm, getStreamIo getImIo 0 (buildIm m) with
+        | Some (a, c, d, w, ld), Some (a', c', d', w', ld') =>
+            a = a' /\ c = c' /\ d = d' /\ w = w' /\ ld = if w'
+                                                         then getNStateForStm (m+n) a
+                                                         else initData zero
+        | None, None => True
+        | _, _ => False
+      end.
+  Proof.
+    unfold getStreamIo, getImIo.
+    induction n.
+    intros m.
+    assert (m+0 = m) by omega.
+    rewrite H.
     simpl.
-    simpl.
+    destruct (getTran
+
 End CreateInstantMemory.
 
 Section AllSa.
-
-  Lemma memVal
-        s s' (t: InstantMemory s s') (stm: Stream InstantMemory s'):
-    match t with
-      | IReq a p d w => if w
-                        then forall a', s' a' = s a'
-                        else s' a = d
-      | IIdle => forall a, s' a = s a
-    end.
-  Proof.    rewrite <- H in *.
-
-    destruct t.
-    destruct w.
-    intuition.
-    destruct (decAddr a a); intuition.
-    intuition.
-  Qed.
-
   Theorem memGood' t:
     forall s (stm: Stream InstantMemory s) a,
     (fst (getStreamState t stm) a = s a /\
@@ -377,6 +341,72 @@ Section AllSa.
                         := Build_StoreAtomicity
                              stm getImIo (storeAtomicityLd' stm) (storeAtomicitySt' stm).
 End AllSa.
+
+Section Final.
+  Variable State: Set.
+  Variable Trans: AllTransitions State.
+  Variable initState: State.
+
+  Theorem buildImSimulate n (stm: Stream Trans initState):
+    forall (getTransIo: forall s s', Trans s s' -> option (Addr * Proc * Data * Desc * Data)),
+      StoreAtomicity stm getTransIo ->
+      getStreamIo getTransIo n stm = getStreamIo getImIo n (buildIm stm getTransIo 0).
+  Proof.
+    intros getTransIo [sLd sSt].
+    pose proof (saInstMem (buildIm stm getTransIo 0)) as [bLd bSt].
+    specialize (sLd n).
+    specialize (sSt n).
+    specialize (bLd n).
+    specialize (bSt n).
+
+    unfold getStreamIo, getImIo in *; simpl in *; unfold getStreamIo in *; simpl in *.
+    destruct (getStreamTransition (buildIm stm getTransIo 0) n).
+    destruct (getStreamTransition (buildIm stm getTransIo 0) n).
+    destruct stm; simpl in *.
+    destruct (getTransIo s s' t); simpl in *.
+    destruct p, p, p, p; simpl in *.
+    repeat f_equal.
+
+    specialize (sLd a p d1 d).
+    specialize (bLd a p d1 d).
+    specialize (sSt a p d1 d).
+    specialize (bSt a p d1 d).
+    destruct d0.
+
+
+
+
+
+    induction n.
+
+    unfold getStreamIo, getImIo in *; simpl in *; unfold getStreamIo in *; simpl in *.
+    destruct stm; simpl in *.
+    destruct (getTransIo s s' t); simpl in *.
+    destruct p, p, p, p; simpl in *.
+    repeat f_equal.
+
+    specialize (sLd a p d1 d).
+    specialize (bLd a p d1 d).
+    specialize (sSt a p d1 d).
+    specialize (bSt a p d1 d).
+    destruct d0.
+
+    assert (H: Some (a,p,d1,Ld,d) = Some (a,p,d1,Ld,d)) by reflexivity.
+    specialize (sLd H).
+
+    destruct sLd as [[done nopast] | [cb [tb [ldb [u1 rest]]]]].
+    auto.
+    assert False by omega; intuition.
+
+    apply (sSt); reflexivity.
+
+    reflexivity.
+
+    assert (Some (a, p, d1, 
+    destruct 
+    intuition.
+    Set Printing All.
+
 
 Section SaSimulate.
   Variable State: Set.
