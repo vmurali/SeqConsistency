@@ -1,4 +1,4 @@
-Require Import DataTypes Channel Cache Coq.Logic.Classical Hier Coq.Relations.Relation_Operators Coq.Relations.Operators_Properties MsiState.
+Require Import Caches.DataTypes Caches.Channel Caches.Cache Coq.Logic.Classical Caches.Hier Coq.Relations.Relation_Operators Coq.Relations.Operators_Properties Caches.MsiState.
 
 Module Type CompatBehavior (dt: DataTypes) (ch: ChannelPerAddr dt).
   Import dt ch.

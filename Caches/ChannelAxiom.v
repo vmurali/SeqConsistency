@@ -1,4 +1,4 @@
-Require Import Rules DataTypes Channel Omega Useful List Coq.Logic.Classical ChannelAxiomHelp.
+Require Import Caches.Rules Caches.DataTypes Caches.Channel Omega Caches.Useful List Coq.Logic.Classical Caches.ChannelAxiomHelp.
 
 Module mkChannel: Channel mkDataTypes.
   Import mkDataTypes.

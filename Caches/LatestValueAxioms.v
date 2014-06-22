@@ -1,4 +1,4 @@
-Require Import Rules Channel DataTypes MsiState ChannelAxiomHelp.
+Require Import Caches.Rules Caches.Channel Caches.DataTypes Caches.MsiState Caches.ChannelAxiomHelp.
 
 Module mkLatestValueAxioms (ch: ChannelPerAddr mkDataTypes).
   Import mkDataTypes ch.

@@ -1,4 +1,4 @@
-Require Import Coq.Logic.Classical Rules DataTypes MsiState L1 Omega Coq.Relations.Relation_Operators Coq.Lists.Streams DataTypes.
+Require Import Coq.Logic.Classical Caches.Rules Caches.DataTypes Caches.MsiState Caches.L1 Omega Coq.Relations.Relation_Operators Coq.Lists.Streams Caches.DataTypes.
 
 Module mkL1Axioms : L1Axioms mkDataTypes.
   Import mkDataTypes.

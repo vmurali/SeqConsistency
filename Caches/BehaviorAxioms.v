@@ -1,4 +1,4 @@
-Require Import Omega Useful Rules ChannelAxiom ChannelAxiomHelp Channel Coq.Logic.Classical MsiState DataTypes Tree HierProperties Cache.
+Require Import Omega Caches.Useful Caches.Rules Caches.ChannelAxiom Caches.ChannelAxiomHelp Caches.Channel Coq.Logic.Classical Caches.MsiState Caches.DataTypes Caches.Tree Caches.HierProperties Caches.Cache.
 
 Module ch' := mkChannel.
 Module ch := mkChannelPerAddr mkDataTypes ch'.

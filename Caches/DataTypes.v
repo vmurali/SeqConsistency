@@ -1,6 +1,7 @@
-Require Import MsiState Tree BaseTree.
+Require Import SeqConsistency.DataTypes Caches.MsiState Caches.Tree Caches.BaseTree.
+Export SeqConsistency.DataTypes.
 
-Export Tree.
+Export Caches.Tree.
 
 Definition hier := getC nil bHier.
 Opaque hier.
@@ -12,8 +13,6 @@ Axiom decAddr: forall a1 a2:Addr, {a1 = a2} + {a1 <> a2}.
 Definition defined c := descendent c hier.
 
 Definition Time := nat.
-
-Inductive Desc := Ld | St.
 
 Definition Index := nat.
 

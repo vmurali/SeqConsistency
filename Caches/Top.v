@@ -1,5 +1,5 @@
-Require Import DataTypes L1 StoreAtomicity LatestValue Cache Channel Compatible
-Rules ChannelAxiom L1Axioms CompatBehavior LatestValueAxioms BehaviorAxioms MsiState Transitions.
+Require Import Caches.DataTypes Caches.L1 SeqConsistency.StoreAtomicity Caches.LatestValue Caches.Cache Caches.Channel Caches.Compatible
+Caches.Rules Caches.ChannelAxiom Caches.L1Axioms Caches.CompatBehavior Caches.LatestValueAxioms Caches.BehaviorAxioms Caches.MsiState SeqConsistency.Transitions.
 
 Set Implicit Arguments.
   Module l1 := mkL1Axioms.
@@ -52,7 +52,9 @@ Set Implicit Arguments.
     assumption.
   Qed.
 
-  Theorem cacheIsStoreAtomic : StoreAtomicity cstm getCacheIo.
+
+  About StoreAtomicity.
+  Theorem cacheIsStoreAtomic : StoreAtomicity zero initData cstm getCacheIo.
   Proof.
     assert  (forall (t: Time) (a : Addr) (c : Tree) (d ld : Data),
       getCacheIo _ _ (getStreamTransition cstm t) = Some (a, c, d, Ld, ld) ->
@@ -107,5 +109,7 @@ Set Implicit Arguments.
     pose proof (@storeAtomicitySt' t a c d ld H0).
     intuition.
 
-    apply (Build_StoreAtomicity _ _ H great).
+    About Build_StoreAtomicity.
+
+    apply (Build_StoreAtomicity zero initData _ _ H great).
   Qed.

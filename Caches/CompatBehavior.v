@@ -1,4 +1,4 @@
-Require Import Compatible DataTypes Rules Channel MsiState List Useful ChannelAxiomHelp.
+Require Import Caches.Compatible Caches.DataTypes Caches.Rules Caches.Channel Caches.MsiState List Caches.Useful Caches.ChannelAxiomHelp.
 
 Module mkCompatBehavior (ch: ChannelPerAddr mkDataTypes): CompatBehavior mkDataTypes ch.
   Import mkDataTypes ch.

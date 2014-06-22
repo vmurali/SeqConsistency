@@ -1,4 +1,4 @@
-Require Import DataTypes Omega.
+Require Import Caches.DataTypes Omega.
 
 Module Type Channel (dt: DataTypes).
   Import dt.

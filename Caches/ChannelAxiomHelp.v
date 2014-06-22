@@ -1,4 +1,4 @@
-Require Import Rules DataTypes Omega Useful List Coq.Logic.Classical.
+Require Import Caches.Rules Caches.DataTypes Omega Caches.Useful List Coq.Logic.Classical.
 Import mkDataTypes.
 
 Opaque oneBeh.

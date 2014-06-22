@@ -1,5 +1,5 @@
-Require Import DataTypes Useful Channel Cache Compatible L1 Coq.Logic.Classical
-Coq.Relations.Operators_Properties Coq.Relations.Relation_Operators List MsiState L1.
+Require Import Caches.DataTypes Caches.Useful Caches.Channel Caches.Cache Caches.Compatible Caches.L1 Coq.Logic.Classical
+Coq.Relations.Operators_Properties Coq.Relations.Relation_Operators List Caches.MsiState.
 (*Require List.*)
 
 Module Type LatestValueAxioms (dt: DataTypes) (ch: ChannelPerAddr dt).

@@ -1,4 +1,4 @@
-Require Import Tree List Omega.
+Require Import Caches.Tree List Omega.
 
 Inductive BaseTree := B: list BaseTree -> BaseTree.
 

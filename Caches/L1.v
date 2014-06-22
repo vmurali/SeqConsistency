@@ -1,4 +1,4 @@
-Require Import DataTypes Omega Coq.Logic.Classical MsiState.
+Require Import Caches.DataTypes Omega Coq.Logic.Classical Caches.MsiState.
 
 Set Implicit Arguments.
 

@@ -1,4 +1,4 @@
-Require Import Arith Omega Useful DataTypes Channel Coq.Logic.Classical MsiState ChannelAxiomHelp.
+Require Import Arith Omega Caches.Useful Caches.DataTypes Caches.Channel Coq.Logic.Classical Caches.MsiState Caches.ChannelAxiomHelp.
 
 
 Module Type BehaviorAxioms (dt: DataTypes) (ch: ChannelPerAddr dt).
