@@ -97,7 +97,7 @@ Section PerProc.
   Definition getCorrectIo s s' (t: Correct s s') :=
     match t with
       | Lod p _ a _ _ v _ _ => Some (a, p, initData zero, Ld, v)
-      | Str p _ a _ v _ => Some (a, p, v, Ld, initData zero)
+      | Str p _ a _ v _ => Some (a, p, v, St, initData zero)
       | NonMem p _ _ _ _ => None
       | Nothing _ => None
     end.
@@ -351,12 +351,145 @@ Section PerProc.
 
     admit.
 
+    Definition isNonMem a b (c : Correct a b) :=
+      match c with
+        | NonMem _ _ _ _ _ => True
+        | _ => False
+      end.
 
-    repeat unfold eq_rec_r, eq_rec, eq_rect, eq_sym, eq_ind,
-    eq_ind_r, getCorrectIo in *.
+    Lemma cast_isNonMem : forall A (x y : A) a b (pf : x = y) e,
+      isNonMem e
+      -> isNonMem (match pf in _ = y' return Correct a (b y') with
+                     | eq_refl => e
+                   end).
+    Proof.
+      destruct pf; auto.
+    Qed.
+
+    Lemma match_isNonMem : forall a b (e : Correct a b) f1 f2,
+      isNonMem e
+      -> match e return option (Addr * Proc * Data * Desc * Data) with
+           | Lod p _ a _ _ v _ _ => f1 a p v
+           | Str p _ a _ v _ => f2 a p v
+           | NonMem _ _ _ _ _ => None
+           | Nothing _ => None
+         end = None.
+    Proof.
+      destruct e; simpl; tauto.
+    Qed.
+
+    repeat unfold eq_rec_r, eq_rec, eq_rect,
+    eq_sym, eq_ind, eq_ind_r, getCorrectIo in *.
     match goal with
-      | H: ?ta2 = match ?P with _ => _ end |- _ =>
-        destruct P
+      | H: ?ta2 = match ?P with _ => _ end |- _ => destruct P
     end.
-    simpl in *.
-    generalize a1a2EqIo a2Eq; clear; intros.
+    exfalso; subst.
+    match goal with
+      | H': _ <> ?P |- _ =>
+            let final := fresh "final" in
+            assert (final: P = None) by (apply match_isNonMem; apply cast_isNonMem;
+                                         constructor);
+              rewrite final in *; tauto
+    end.
+
+    Definition isStore a b (c : Correct a b) p0 a0 v0 :=
+      match c with
+        | Str p _ a _ v _ => p0 = p /\ a0 = a /\ v0 = v
+        | _ => False
+      end.
+
+    Lemma cast_isStore : forall A (x y : A) a b (pf : x = y) e p0 a0 v0,
+      isStore e p0 a0 v0
+      -> isStore (match pf in _ = y' return Correct a (b y') with
+                     | eq_refl => e
+                   end) p0 a0 v0.
+    Proof.
+      destruct pf; auto.
+    Qed.
+
+    Lemma match_isStore : forall p0 a0 v0 a1 b1 (e : Correct a1 b1) f1 f2,
+      isStore e p0 a0 v0
+      -> match e return option (Addr * Proc * Data * Desc * Data) with
+           | Lod p _ a _ _ v _ _ => f1 a p v
+           | Str p _ a _ v _ => f2 a p v
+           | NonMem _ _ _ _ _ => None
+           | Nothing _ => None
+         end = f2 a0 p0 v0.
+    Proof.
+      intros.
+      unfold isStore in *.
+      destruct e; intuition; subst; eauto.
+    Qed.
+
+    repeat unfold eq_rec_r, eq_rec, eq_rect,
+    eq_sym, eq_ind, eq_ind_r, getCorrectIo in *.
+    match goal with
+      | H: ?ta2 = match ?P with _ => _ end |- _ => destruct P
+    end.
+    exfalso; subst.
+    match goal with
+      | H': _ <> ?P |- _ =>
+            let final := fresh "final" in
+            assert (final: P = Some (a, p, v, St, initData zero)) by
+                (apply (@match_isStore p a v); apply cast_isStore; constructor; intuition);
+              rewrite final in *; tauto
+    end.
+
+    Print Lod.
+    Definition isLoad a b (c : Correct a b) p0 a0 v0 :=
+      match c with
+        | Lod p _ a _  _ v _ _ => p0 = p /\ a0 = a /\ v0 = v
+        | _ => False
+      end.
+
+    Lemma cast_isLoad : forall A (x y : A) a b (pf : x = y) e p0 a0 v0,
+      isLoad e p0 a0 v0
+      -> isLoad (match pf in _ = y' return Correct a (b y') with
+                     | eq_refl => e
+                   end) p0 a0 v0.
+    Proof.
+      destruct pf; auto.
+    Qed.
+
+    Lemma match_isLoad : forall p0 a0 v0 a1 b1 (e : Correct a1 b1) f1 f2,
+      isLoad e p0 a0 v0
+      -> match e return option (Addr * Proc * Data * Desc * Data) with
+           | Lod p _ a _ _ v _ _ => f1 a p v
+           | Str p _ a _ v _ => f2 a p v
+           | NonMem _ _ _ _ _ => None
+           | Nothing _ => None
+         end = f1 a0 p0 v0.
+    Proof.
+      intros.
+      unfold isLoad in *.
+      destruct e; intuition; subst; eauto.
+    Qed.
+
+    repeat unfold eq_rec_r, eq_rec, eq_rect,
+    eq_sym, eq_ind, eq_ind_r, getCorrectIo in *.
+    match goal with
+      | H: ?ta2 = match ?P with _ => _ end |- _ => destruct P
+    end.
+    exfalso; subst.
+    match goal with
+      | H': _ <> ?P |- _ =>
+            let final := fresh "final" in
+            assert (final: P = Some (a, p, initData zero, Ld, v)) by
+                (apply (@match_isLoad p a v); apply cast_isLoad; constructor; intuition);
+              rewrite final in *; tauto
+    end.
+
+    repeat unfold eq_rec_r, eq_rec, eq_rect,
+    eq_sym, eq_ind, eq_ind_r, getCorrectIo in *.
+    match goal with
+      | H: ?ta2 = match ?P with _ => _ end |- _ => destruct P
+    end.
+    exfalso; subst.
+    match goal with
+      | H': _ <> ?P |- _ =>
+            let final := fresh "final" in
+            assert (final: P = Some (a, p, initData zero, Ld, v')) by
+                (apply (@match_isLoad p a v'); apply cast_isLoad; constructor; intuition);
+              rewrite final in *; tauto
+    end.
+  Qed.
