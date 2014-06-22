@@ -47,18 +47,23 @@ Section GeneralTransitions.
       assumption.
     Qed.
 
-    Fixpoint getStreamTransition n s (ts: Stream s): Transition (fst (getStreamState n ts))
+    Fixpoint getStreamTransition s (ts: Stream s) n: Transition (fst (getStreamState n ts))
                                                                 (snd (getStreamState n ts)) :=
       match ts with
         | TCons _ _ t ts' => match n with
                                 | 0 => t
-                                | S m => getStreamTransition m ts'
+                                | S m => getStreamTransition ts' m
                               end
       end.
 
+    Theorem nextStmEq s s' (t: Transition s s') (ts: Stream s') n :
+      getStreamTransition ts n = getStreamTransition (TCons t ts) (S n).
+    Proof.
+      reflexivity.
+    Qed.
 
     Definition getStreamIo n s (ts: Stream s): Io :=
-      getTransitionIo (getStreamTransition n ts).
+      getTransitionIo (getStreamTransition ts n).
   End OneTransition.
 End GeneralTransitions.
 
@@ -157,18 +162,18 @@ Section ParallelCompose.
 
   Definition getStreamATrans x (sab: Stream TransAB x) n:
     TransA (fst (fst (getStreamState n sab))) (fst (snd (getStreamState n sab))) :=
-    match getStreamTransition n sab in TransAB x y return TransA (fst x) (fst y) with
+    match getStreamTransition sab n in TransAB x y return TransA (fst x) (fst y) with
       | ABTrans _ _ ta _ _ _ _ => ta
     end.
 
   Definition getStreamBTrans x (sab: Stream TransAB x) n:
     TransB (snd (fst (getStreamState n sab))) (snd (snd (getStreamState n sab))) :=
-    match getStreamTransition n sab in TransAB x y return TransB (snd x) (snd y) with
+    match getStreamTransition sab n in TransAB x y return TransB (snd x) (snd y) with
       | ABTrans _ _ _ _ _ ta _ => ta
     end.
 
   Definition getStreamEq x (sab: Stream TransAB x) n :=
-    match getStreamTransition n sab as t0 return match t0 with
+    match getStreamTransition sab n as t0 return match t0 with
                                                    | ABTrans _ _ ta _ _ tb _ =>
                                                      getTransAIo ta = getTransBIo tb
                                                  end with
@@ -258,7 +263,7 @@ Section ParallelCompose.
     pose proof (streamTb n sab).
     rewrite H, H0. clear H H0.
     unfold getStreamATrans, getStreamBTrans.
-    destruct (getStreamTransition n sab).
+    destruct (getStreamTransition sab n).
     intuition.
   Qed.
 
