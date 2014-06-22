@@ -349,7 +349,14 @@ Section PerProc.
                                                    apply (H H1)
       end).
 
-    admit.
+    apply (exist _ (Build_TransB2Rec _ _ _ (IIdle b21))).
+    simpl in *.
+    injection a1b2EqIo; intros.
+    rewrite <- H1.
+    match goal with
+      | |- context [match ?P with _ => _ end] => destruct P
+    end.
+    tauto.
 
     Definition isNonMem a b (c : Correct a b) :=
       match c with
@@ -435,7 +442,6 @@ Section PerProc.
               rewrite final in *; tauto
     end.
 
-    Print Lod.
     Definition isLoad a b (c : Correct a b) p0 a0 v0 :=
       match c with
         | Lod p _ a _  _ v _ _ => p0 = p /\ a0 = a /\ v0 = v
@@ -492,4 +498,16 @@ Section PerProc.
                 (apply (@match_isLoad p a v'); apply cast_isLoad; constructor; intuition);
               rewrite final in *; tauto
     end.
+  Qed.
+
+  Theorem finalCondition:
+    forall a1 a1' (ta1: Spec a1 a1')
+           b21 b21' (tb1: InstantMemory b21 b21')
+           (a1b2EqIo: getSpecIo ta1 = getImIo tb1)
+           (a1a2EqIo: getSpecIo ta1 <> getCorrectIo (convertSpecToCorrect ta1)),
+      {rec | getCorrectIo (convertSpecToCorrect ta1) = getImIo (tb2 rec) /\
+             b21 = b2 rec /\ b21' = b2' rec}.
+  Proof.
+    intros.
+    apply (bigCondition ta1 tb1 a1b2EqIo (eq_refl (convertSpecToCorrect ta1)) a1a2EqIo).
   Qed.
