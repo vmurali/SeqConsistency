@@ -380,6 +380,8 @@ Section ComplexSimulate.
   Variable getA2FromA1: StateA1 -> StateA2.
   Variable getB2FromB1: StateB1 -> StateB2.
 
+  Variable decIo: forall i1 i2: Io, {i1=i2}+{i1<>i2}.
+
   Definition TransA1B1 := TransAB getTransA1Io getTransB1Io.
   Definition TransA1B2 := TransAB getTransA1Io getTransB2Io.
   Definition TransA2B2 := TransAB getTransA2Io getTransB2Io.
@@ -470,22 +472,33 @@ Section ComplexSimulate.
        exists b2 (sb2: Stream TransB2 b2),
          forall n, getStreamIo getTransB1Io n sb1 = getStreamIo getTransB2Io n sb2).
 
-    Variable transB2Convert: forall s1 s2, TransB2 s1 s2 -> TransB2 s1 s2.
-
-    Variable ioConvertA1ToA2: Io -> Io.
-
-    Variable transB2ConvertGood:
-    forall s1 s2 (t: TransB2 s1 s2),
-      getTransB2Io (transB2Convert t) = ioConvertA1ToA2 (getTransB2Io t).
-
     Variable convertA1ToA2:
     (forall a1 a1', TransA1 a1 a1' ->
                     TransA2 (getA2FromA1 a1) (getA2FromA1 a1')).
 
-    Variable convertA1ToA2Good:
-    forall s1 s2 (t: TransA1 s1 s2),
-      getTransA2Io (convertA1ToA2 t) = ioConvertA1ToA2 (getTransA1Io t).
-    
+    Theorem small1ForBigCondition:
+      forall a1 a1' (ta1: TransA1 a1 a1')
+             b21 b21' (tb1: TransB2 b21 b21')
+             (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1)
+             (a1a2EqIo: getTransA1Io ta1 = getTransA2Io (convertA1ToA2 ta1)),
+        {rec | getTransA2Io (convertA1ToA2 ta1) = getTransB2Io (tb2 rec) /\
+               b21 = b2 rec /\ b21' = b2' rec}.
+    Proof.
+      intros.
+      apply (exist _ (Build_TransB2Rec tb1)).
+      rewrite a1b2EqIo in a1a2EqIo.
+      rewrite <- a1a2EqIo.
+      simpl; intuition.
+    Qed.
+
+    Variable notIoEqExistRec:
+      forall a1 a1' (ta1: TransA1 a1 a1')
+             b21 b21' (tb1: TransB2 b21 b21')
+             (a1b2EqIo: getTransA1Io ta1 = getTransB2Io tb1)
+             (a1a2EqIo: getTransA1Io ta1 <> getTransA2Io (convertA1ToA2 ta1)),
+        {rec | getTransA2Io (convertA1ToA2 ta1) = getTransB2Io (tb2 rec) /\
+               b21 = b2 rec /\ b21' = b2' rec}.
+
     Theorem bigCondition:
       forall a1 a1' (ta1: TransA1 a1 a1')
              b21 b21' (tb1: TransB2 b21 b21')
@@ -493,11 +506,9 @@ Section ComplexSimulate.
         {rec | getTransA2Io (convertA1ToA2 ta1) = getTransB2Io (tb2 rec) /\ b21 = b2 rec /\ b21' = b2' rec}.
     Proof.
       intros.
-      pose proof (transB2ConvertGood tb1) as u1.
-      pose proof (convertA1ToA2Good ta1) as u2.
-      rewrite <- a1b2EqIo in u1.
-      rewrite <- u1 in u2.
-      apply (exist _ (Build_TransB2Rec (transB2Convert tb1))); intuition.
+      destruct (decIo (getTransA1Io ta1) (getTransA2Io (convertA1ToA2 ta1))) as [u1 | u2].
+      apply (small1ForBigCondition a1b2EqIo u1); intuition.
+      apply (notIoEqExistRec a1b2EqIo u2); intuition.
     Qed.
 
     Theorem canConvert:
@@ -524,3 +535,5 @@ Section ComplexSimulate.
     
   End ProvingStatesMatch.
 End ComplexSimulate.
+
+About statesMatchFinal.
