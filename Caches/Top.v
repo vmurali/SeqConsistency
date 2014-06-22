@@ -55,19 +55,19 @@ Set Implicit Arguments.
   Theorem cacheIsStoreAtomic : StoreAtomicity cstm getCacheIo.
   Proof.
     assert  (forall (t: Time) (a : Addr) (c : Tree) (d ld : Data),
-      getCacheIo _ _ (getStreamTransition t cstm) = Some (a, c, d, Ld, ld) ->
+      getCacheIo _ _ (getStreamTransition cstm t) = Some (a, c, d, Ld, ld) ->
       ld = initData a /\
       (forall ti : nat,
        0 <= ti < t ->
        forall (ci : Tree) (di ldi : Data),
-       getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)) \/
+       getCacheIo _ _ (getStreamTransition cstm ti) <> Some (a, ci, di, St, ldi)) \/
       (exists (cb : Tree) (tb : nat) (ldb : Data),
          tb < t /\
-         getCacheIo _ _ (getStreamTransition tb cstm) = Some (a, cb, ld, St, ldb) /\
+         getCacheIo _ _ (getStreamTransition cstm tb) = Some (a, cb, ld, St, ldb) /\
          (forall ti : nat,
           tb < ti < t ->
           forall (ci : Tree) (di ldi : Data),
-          getCacheIo _ _ (getStreamTransition ti cstm) <> Some (a, ci, di, St, ldi)))).
+          getCacheIo _ _ (getStreamTransition cstm ti) <> Some (a, ci, di, St, ldi)))).
     intros.
     pose proof (@storeAtomicityLd' t a c d ld).
     destruct H0.
@@ -97,7 +97,7 @@ Set Implicit Arguments.
     
 
     assert (great: forall t a c d ld,
-      getCacheIo _ _ (getStreamTransition t cstm) = Some (a, c, d, St, ld) ->
+      getCacheIo _ _ (getStreamTransition cstm t) = Some (a, c, d, St, ld) ->
       ld = initData zero).
 
     intros.
