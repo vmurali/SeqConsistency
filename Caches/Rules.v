@@ -1,4 +1,4 @@
-Require Import Caches.DataTypes Coq.Lists.Streams Coq.Logic.Classical_Prop Caches.Tree List Caches.MsiState Coq.Relations.Relation_Operators Transitions.
+Require Import Caches.DataTypes Coq.Lists.Streams Coq.Logic.Classical_Prop Caches.Tree List Caches.MsiState Coq.Relations.Relation_Operators TransitionsNew.
 
 Record BaseMesg :=
   { fromB: State;

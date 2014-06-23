@@ -1,5 +1,5 @@
 Require Import Caches.DataTypes Caches.L1 SeqConsistency.StoreAtomicity Caches.LatestValue Caches.Cache Caches.Channel Caches.Compatible
-Caches.Rules Caches.ChannelAxiom Caches.L1Axioms Caches.CompatBehavior Caches.LatestValueAxioms Caches.BehaviorAxioms Caches.MsiState SeqConsistency.Transitions.
+Caches.Rules Caches.ChannelAxiom Caches.L1Axioms Caches.CompatBehavior Caches.LatestValueAxioms Caches.BehaviorAxioms Caches.MsiState SeqConsistency.TransitionsNew.
 
 Set Implicit Arguments.
   Module l1 := mkL1Axioms.

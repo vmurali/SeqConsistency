@@ -1,4 +1,4 @@
-Require Import SeqConsistency.Transitions SeqConsistency.DataTypes SeqConsistency.Useful.
+Require Import SeqConsistency.TransitionsNew SeqConsistency.DataTypes SeqConsistency.Useful.
 
 Set Implicit Arguments.
 

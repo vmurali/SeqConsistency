@@ -1,4 +1,4 @@
-Require Import SeqConsistency.StoreAtomicity SeqConsistency.Fresh Caches.Top SeqConsistency.Transitions Caches.Rules SeqConsistency.DataTypes.
+Require Import SeqConsistency.StoreAtomicity SeqConsistency.FreshNew Caches.Top SeqConsistency.TransitionsNew Caches.Rules SeqConsistency.DataTypes.
 
 About statesMatchFinal.
 
@@ -13,14 +13,6 @@ Section Merge.
 
   Definition InstantMemory := @InstantMemory Addr Data Proc decAddr initData.
   Definition getImIo := @getImIo Addr Data Proc zero decAddr initData.
-
-  Variable cacheIsStoreAtomic: forall stm,
-                                 @StoreAtomicity _ _ _ zero initData
-                                                 _ _ initGlobalState stm getCacheIo.
-  Definition simulateImProof stm :=
-    @actualSimThm Addr Data Proc zero decAddr initData GlobalState
-                     Transition initGlobalState stm getCacheIo
-                     (cacheIsStoreAtomic stm).
 
   Variable Pc PState DeltaPState: Set.
   Variable updSt: PState -> DeltaPState -> PState.
@@ -54,57 +46,51 @@ Section Merge.
                                      nextPpc set get.
 
   Definition stateA1ToA2 := @stateA1ToA2 Addr Data Proc Pc PState Rob Ppc.
-  Definition convertSpecToCorrect := @convertSpecToCorrect Addr Data Proc zero decAddr decProc
-                                                           initData Pc PState DeltaPState
-                                                           updSt getDecodeElem getLoadDelta Rob
-                                                           Ppc retire compute empty add getLoad
-                                                           issueLoad updLoad commit
-                                                           nextPpc set.
+  About stMatch.
 
-  Definition finalCondition := @finalCondition Addr Data Proc zero decAddr decProc initData Pc
-                                               PState DeltaPState updSt getDecodeElem
-                                               getLoadDelta Rob Ppc retire compute empty add
-                                               getLoad issueLoad
-                                               updLoad commit nextPpc set get.
+  Variable pc0: Pc.
+  Variable state0: PState.
+  Variable rob0: Rob.
+  Variable ppc0: Ppc.
 
-  About statesMatchFinal.
-  Definition Io := option (Addr * Proc * Data * Desc * Data).
+  Variable sa1b1: Stream
+             (TransAB getSpecIo
+                getCacheIo)
+             (fun _ : Proc => initSpecState Addr Data pc0 state0 rob0 ppc0,
+             initGlobalState).
 
-  Variable decData: forall d1 d2: Data, {d1=d2}+{d1<>d2}.
+  Definition cstm := getStreamB sa1b1.
 
-  Theorem decIo: forall i1 i2: Io, {i1=i2}+{i1 <> i2}.
-  Proof.
-    intros.
-    unfold Io in *.
-    decide equality.
-    destruct a,p.
-    decide equality.
-    destruct a,p1.
-    decide equality.
-    decide equality.
-    destruct a,p3.
-    decide equality.
-    destruct a,p5.
-    decide equality.
-    apply decTree.
-    apply decAddr.
-  Qed.
 
-  About statesMatchFinal.
+  Variable cacheIsStoreAtomic: @StoreAtomicity Addr Data Proc zero initData
+                                               GlobalState Transition initGlobalState cstm
+                                               getCacheIo.
+  Definition simulateImProof :=
+    @actualSimThm Addr Data Proc zero decAddr initData GlobalState
+                     Transition initGlobalState cstm getCacheIo
+                     (cacheIsStoreAtomic).
+
+  About stMatch.
+  About simulateImProof.
+
+  About buildIm.
+
+  Definition buildIm := @buildIm Addr Data Proc decAddr initData GlobalState Transition
+                                 initGlobalState cstm getCacheIo 0.
+
+  About buildImSimulate.
+  Definition buildImSimulate := @buildImSimulate Addr Data Proc zero decAddr initData
+                                                 GlobalState Transition initGlobalState
+                                                 cstm getCacheIo cacheIsStoreAtomic.
+
   Definition finalTheorem :=
-    statesMatchFinal getCorrectIo getImIo stateA1ToA2 decIo
-                     (simulateImProof) convertSpecToCorrect finalCondition.
-About SpecState.
-About getImIo.
+    @stMatch Addr Data Proc zero decAddr decProc initData Pc PState DeltaPState
+             pc0 state0 updSt getDecodeElem getLoadDelta Rob Ppc retire compute
+             empty add getLoad issueLoad updLoad commit nextPpc set get rob0 ppc0
+             GlobalState initGlobalState Transition getCacheIo sa1b1
+             buildIm buildImSimulate.
 
-Definition finalTheorem :=
-  @statesMatchFinal
-    (Proc -> (@SpecState))
-    (Proc -> ProcState)
-    Caches.Rules.GlobalState
-    (Addr -> Data).
-    Caches.Rules.getCacheIo
-    (@getImIo _ _ _ zer initData)
-    stateA1ToA2.
-    (Spec decAddr decProc updSt getDecodeElem getLoadDelta retire compute empty
-          add getLoad issueLoad updLoad commit nextPpc set get).
+  About finalTheorem.
+End Merge.
+
+About finalTheorem.
