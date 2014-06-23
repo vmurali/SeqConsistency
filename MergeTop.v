@@ -14,11 +14,13 @@ Section Merge.
   Definition InstantMemory := @InstantMemory Addr Data Proc decAddr initData.
   Definition getImIo := @getImIo Addr Data Proc zero decAddr initData.
 
-  About actualSimThm.
+  Variable cacheIsStoreAtomic: forall stm,
+                                 @StoreAtomicity _ _ _ zero initData
+                                                 _ _ initGlobalState stm getCacheIo.
   Definition simulateImProof stm :=
     @actualSimThm Addr Data Proc zero decAddr initData GlobalState
                      Transition initGlobalState stm getCacheIo
-                     cacheIsStoreAtomic.
+                     (cacheIsStoreAtomic stm).
 
   Variable Pc PState DeltaPState: Set.
   Variable updSt: PState -> DeltaPState -> PState.
@@ -91,7 +93,7 @@ Section Merge.
   About statesMatchFinal.
   Definition finalTheorem :=
     statesMatchFinal getCorrectIo getImIo stateA1ToA2 decIo
-                     simulateImProof convertSpecToCorrect finalCondition.
+                     (simulateImProof) convertSpecToCorrect finalCondition.
 About SpecState.
 About getImIo.
 
