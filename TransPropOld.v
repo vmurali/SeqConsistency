@@ -242,9 +242,8 @@ Section MultiTrans.
                            | Some x => x :: ls
                            | None => ls
                          end) as sth3.
-    destruct H1.
 
-    rewrite Heqsth2 in *.
+    rewrite Heqsth2, Heqsth3 in *.
 
     destruct H0.
     destruct l.
