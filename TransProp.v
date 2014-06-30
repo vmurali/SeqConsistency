@@ -445,3 +445,5 @@ Section Test.
   Qed.
 
 End Test.
+
+About multiSim.
