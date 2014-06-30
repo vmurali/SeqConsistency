@@ -235,182 +235,116 @@ Section MultiTrans.
 
     intros.
     specialize (IHClos Heqsth).
-    rewrite Heqsth in *.
-
-    remember (sa i) as sth2.
-    remember (filterId i match alpha with
-                           | Some x => x :: ls
-                           | None => ls
-                         end) as sth3.
-    destruct H1.
-
-    rewrite Heqsth2 in *.
+    rewrite Heqsth in *; clear Heqsth.
 
     destruct H0.
+
     destruct l.
 
     simpl in *.
-    destruct (decIdx i i0); simpl in *.
-    rewrite <- e in *.
-
-    discriminate.
-
-    specialize (IHClos (sa i) i).
-    rewrite <- Heqsth3 in *.
-
-    specialize (IHClos (Refl (A i) (sa i))).
-
-    assert ((fun i' : Idx => if decIdx i i' then sa i else m i') i0 = m i0).
-    destruct (decIdx i i0); intuition.
-
-    rewrite <- H1 in H0.
-    pose proof (Step (fun i' : Idx => if decIdx i i' then sa i else m i') H0) as step.
-    simpl in *.
-
-    assert ((fun i' : Idx =>
-            if decIdx i0 i' then x' else if decIdx i i' then sa i else m i') =
-             (fun i' : Idx =>
-                if decIdx i i' then sa i else if decIdx i0 i' then x' else m i')).
-    apply (functional_extensionality).
-    intros.
-    destruct (decIdx i0 x), (decIdx i x).
-    rewrite e, e0 in *.
-    intuition.
-    intuition.
-    intuition.
-    intuition.
-
-    rewrite H2 in step.
-    apply (Trans _ _ IHClos step).
-
-    specialize (IHClos (sa i) i).
-    rewrite <- Heqsth3 in *.
-    specialize (IHClos (Refl (A i) (sa i))).
 
     destruct (decIdx i i0).
     rewrite <- e in *.
 
-    assert ( (fun i' : Idx =>
-      if decIdx i i' then sa i else if decIdx i i' then x' else m i') =
-              (fun i' : Idx => if decIdx i i' then sa i else m i')).
+    pose proof (moreTrans H1) as [u1 [c1 c2]].
+
+    specialize (IHClos _ _ c1).
+
+    assert (eq: (fun i' => if decIdx i i' then si' else if decIdx i i' then x' else m i') =
+                (fun i' => if decIdx i i' then si' else m i')).
     apply functional_extensionality.
-    intros.
-    destruct (decIdx i x); reflexivity.
-    rewrite H1 in *.
+    intros;
+      destruct (decIdx i x); reflexivity.
 
-    intuition.
+    rewrite eq.
 
-    assert ((fun i' => if decIdx i i' then sa i else m i') i0 = m i0).
-    destruct (decIdx i i0); intuition.
+    assert (bad: (fun i' => if decIdx i i' then u1 else m i') i = u1) by
+           (destruct (decIdx i i); intuition).
 
-    rewrite <- H1 in H0.
-
-    pose proof (Step (fun i' : Idx => if decIdx i i' then sa i else m i') H0) as step.
-    simpl in *.
-
-    pose proof (Trans _ _ IHClos step).
-
-    assert ((fun i' : Idx =>
-            if decIdx i0 i' then x' else if decIdx i i' then sa i else m i') =
-             (fun i' : Idx =>
-                if decIdx i i' then sa i else if decIdx i0 i' then x' else m i')).
-    apply (functional_extensionality).
-    intros.
-    destruct (decIdx i0 x), (decIdx i x).
-    rewrite e, e0 in *.
-    intuition.
-    intuition.
-    intuition.
-    intuition.
-
-    rewrite H3 in H2.
-    intuition.
-
+    rewrite <- bad in c2.
     
-    intuition.
-    simpl in *.
+    pose proof (constTrans IHClos c2) as u2; simpl in *.
 
-
-    pose proof (Step 
-    
-
-
-    apply Trans; intuition.
-    rewrite e in *.
-    destruct (decIdx i x).
-    rewrite e, e0 in *.
-
-    
-
-    destruct H0.
-    pose proof 
-
-    destruct in *.
-    destruct alpha.
-    simpl in *.
-    destruct H0.
-    simpl in *.
-    destruct H0.
-
-    destruct l; simpl in *.
-
-    destruct (decIdx i i0).
-
-    rewrite <- e in *.
-    
-    simpl in *.
-
-    destruct alpha.
-
-
-    simpl in *.
-    destruct p.
-    destruct (decIdx i i0).
-    rewrite <- e in *.
-
-    pose proof (moreTrans H1) as [a' [c1 c2]].
-    specialize (IHClos a' i c1).
-
-    assert ((fun i' => if decIdx i i' then a' else b i') i = a') by
-        (destruct (decIdx i i); intuition).
-
-    rewrite <- H2 in c2.
-
-    destruct H0.
-    dependent destruction H0.
-
-    
-    pose proof (constTrans (Trans _ _ IHClos H0) c2) as good.
-
-    simpl in good.
-
-    assert ((fun i' => if decIdx i i' then si' else if decIdx i i' then a' else b i') =
-            fun i' => if decIdx i i' then si' else b i').
+    assert (eq2: (fun i' => if decIdx i i' then si' else if decIdx i i' then u1 else m i') =
+                 (fun i' => if decIdx i i' then si' else m i')).
     apply functional_extensionality.
-    intros.
-    destruct (decIdx i x); reflexivity.
+    intros;
+      destruct (decIdx i x); reflexivity.
 
-    rewrite H3 in *.
-
+    rewrite eq2 in *.
     intuition.
 
     specialize (IHClos _ _ H1).
 
-    rewrite Heqsth in *.
-
-    pose proof (Trans _ _ IHClos H0).
-    constructor 2.
-
-    destruct alpha.
-    simpl in *.
-
-    destruct p.
-    destruct (decIdx i i0).
     
-    constructor 2.
+    assert ((fun i' => if decIdx i i' then si' else m i') i0 = m i0).
+    destruct (decIdx i i0); intuition.
+ 
+    rewrite <- H2 in H0.
+    pose proof (Step (fun i' => if decIdx i i' then si' else m i') H0); simpl in *.
+
+    pose proof (Trans _ _ IHClos H3) as sth; simpl in *.
+
+    assert ((fun i' => if decIdx i0 i' then x' else if decIdx i i' then si' else m i') =
+            (fun i' => if decIdx i i' then si' else if decIdx i0 i' then x' else m i')).
+    apply functional_extensionality.
+    intros.
+    destruct (decIdx i0 x).
+    rewrite <- e in *.
+    destruct (decIdx i i0); intuition.
+    intuition.
+
+    rewrite <- H4.
+    intuition.
+
+    
+    pose proof (Step _ H0); simpl in *.
+
+    pose proof (Trans _ _ H H2); simpl in *.
+    intuition.
 
 
 
+
+    specialize (IHClos _ _ H1).
+
+    destruct (decIdx i i0).
+
+    rewrite e in *.
+
+    assert ((fun i' : Idx => if decIdx i0 i' then si' else m i') =
+            (fun i' : Idx =>
+               if decIdx i0 i' then si' else if decIdx i0 i' then x' else m i')).
+    apply functional_extensionality.
+    intros.
+    destruct (decIdx i0 x); intuition.
+
+    rewrite <- H5.
+
+    intuition.
+
+    assert ((fun i' => if decIdx i i' then si' else m i') i0 = m i0).
+    destruct (decIdx i i0); intuition.
+
+    rewrite <- H5 in H0.
+    pose proof (Step (fun i' => if decIdx i i' then si' else m i') H0) as sth2; simpl in *.
+
+    pose proof (Trans _ _ IHClos sth2) as sth; simpl in *.
+ 
+    assert ((fun i' => if decIdx i0 i' then x' else if decIdx i i' then si' else m i') =
+            (fun i' => if decIdx i i' then si' else if decIdx i0 i' then x' else m i')).
+    apply functional_extensionality.
+    intros.
+    destruct (decIdx i0 x).
+    rewrite <- e in *.
+    destruct (decIdx i i0); intuition.
+    intuition.
+
+    rewrite <- H6.
+
+    intuition.
+
+  Qed.
 End MultiTrans.
 
 Section Test.
@@ -458,7 +392,53 @@ Section Test.
 
     destruct (f l); simpl in *.
 
-    admit.
+    Theorem comm i: forall ls, mapRm f (filterId decIdx i ls) = filterId decIdx i (mapRm fMulti ls).
+    Proof.
+      induction ls.
+      reflexivity.
+      simpl.
+      destruct a.
+      destruct (decIdx i i0).
+      simpl.
+      destruct (f l).
+      simpl.
+      destruct (decIdx i i0).
+      f_equal.
+      intuition.
+      intuition.
+
+      intuition.
+
+      simpl.
+      destruct (f l).
+
+      simpl.
+
+      destruct (decIdx i i0).
+      intuition.
+      intuition.
+      intuition.
+    Qed.
+
+    simpl.
+
+    pose proof (@comm i ls) as sth.
+    rewrite sth in *.
+
+    pose proof (replaceMulti closb' _ closb) as u1.
+
+
+    pose proof constTrans.
+
+    pose proof (@constTrans Sb L Idx decIdx B sb _ (mapRm fMulti ls) i (l0 :: nil) sbi'' u1).
+    simpl in *.
+    destruct (decIdx i i).
+    specialize (H1 stepB).
+
+    exists (fun i' => if decIdx i i' then sbi'' else if decIdx i i' then sbi' else sb' i').
+    intuition.
+
+    intuition.
 
     exists sb'; intuition.
     exists sb'; intuition.
