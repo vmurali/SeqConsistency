@@ -1,141 +1,239 @@
-nochangeWait':
-If a request is sent at time t and no response has been received forall ti, t <
-ti <= t+td, such that it is a response for the request, then at (t+S td), wait
-state will be set to that request at ti.
-Proof: Wait changes only on receiving the appropriate response.
-
-sendrImpNoSendr:
-If a request has been sent at t1 and another at t2 > t1, then here exists a
-time t', t1 < t' <= t2, such that the state requested in the first request has
-been reached.
-Proof: Wait is true exactly till appropriate response has been received, and no
-request can be sent while waiting. So, if the second request is sent, then the
-first must have stopped waiting and that means the requested state must have
-been reached.
-
-noChange:
-If no response has been sent or received at tn such that t <= tn < t' and t < t',
-then state at t' = state at t.
-Proof: Obvious.
-
-noChange2:
-If no response has been sent or received at tn such that t <= tn < t' and t <= t',
-then state at t' = state at t.
-Proof: Obvious.
-
-noWaitWaitImpMark:
-If a cache wasn't waiting at t1 but is waiting at t2 > t1, then there exists
-t, t1 <= t < t2, such that a request has been sent and corresponds to an upgrade
-or a downgrade from the state at t, as the case may be.
-Proof: Wait changes only on sending a request, and a request is sent only on
-upgrade or downgrade as the case may be.
-
-noWaitChange:
-If there is no (upgrade or downgrade) request sent in y, t1 <= y < t2,
-t1 <= t2, and no response which corresponds to a wait in the same period, then
-wait remains the same at t1 and t2 (whether it was originally waiting at
-t1 or not).
-Proof: Sending a request and getting a response are the only ways to change a
-wait state.
-
-noWaitSChange:
-If there is no request sent at y, t1 <= y < t2, t1 <= t2, then the state
-a cache is waiting for remains the same.
-Proof: It's a detail where the state a cache is waiting for is updated only
-on sending a request.
-
-waitImpMarkNotRecv:
-If waiting is true at time t , then there exists a previous time sr when a
-request was sent, and forall y, sr < y < t, no request was sent and forall rm,
-sr <= rm < t, if a response is received, then it doesn't correspond to the wait
-response.
-Proof: Obvious.
-
-voluntary:
-At a child, if a request was sent at t, and a response sent at t' > t, (if
-forall tm, t < tm <= t', state at tm < requested upgrade), then there must be a
-request for which the response was sent at time t', and that request must be
-an actual downgrade request, i.e. the cache should be downgrading to handle
-this request
-Proof: Voluntary response can only be sent if it is not waiting for a response,
-and if a request was sent without the state actually upgrading corrsponding to
-that request, then it must be in wait state and hence not able to send voluntary
-response
-
-sendImpNoSendm:
-At a parent, if a request was sent at t1 and a response at time t2 > t1, then
-there exists t', t1 < t' < t2, such that at least the requested state's
-response is received by the parent.
-Proof: A response can be sent by the parent only when it is not waiting for a
-response, so the response for the original request must have returned.
-
-whenChildHighRecvm:
-If a child upgrades, it must have received the appropriate response from the
-parent.
-Proof: Obvious.
-
-whenChildHigh:
-If a child's state is higher at t' > t than it was previously at t, then there
-must be an appropriate response received at t'', t <= t'' < t'.
-Proof: Obvious from whenChildHighRecvm.
-
-whenChildHighConv:
-If a child didn't receive any appropriate response at t'', t <= t'' < t', where
-t' >= t, then its state at t' must be less than or equal to the state at t.
-Proof: Same as above, add the case when t' = t.
-
-dirRecvImpLow:
-When a parent receives a response, then the directory state downgrades
-Proof: Obvious.
-
-whenDirLow: (and its converse)
-When a directory is higher at t' than at t, where t <= t', then there exists a
-response sent by parent at t'', t <= t'' < t'.
-Proof: Obvious.
-
-dirCantGoLower:
-If the directory state at t is greater than x, then if (no response was sent
-or no response to state less than or equal to x received) at time tn,
-t <= tn < t1, t <= t1, then, directory state at t1 is greater than x.
-Proof: Obvious.
-
-pRespFifo:
-Parent to child responses are in FIFO order.
-Proof: Obvious
-
 cReqPRespCross:
 Given tc, tp, child sent request at tc, parent sent response at tp, then these
-messages cannot cross, i.e. it cannot be true that child hasn't received the response
-at any time tc' < tc and parent hasn't received the request at any time tp' <= tp.
-Proof: Use strong induction on t such that tc, tp both <= t.
-Assume for all values < t.
-Case: t=0:
-Parent must have received a request at 0, since it can send response only
-on receiving a request. This request must be sent at 0. Since the original request
-is sent at 0, they must be the same and parent receives it at 0, contradicting
-the condition.
-Case: t > 0:
-Let the request corresponding to the response that the parent sent be sent by
-child at t'.
-Case t' = tc:
-Again, this must be the same request, which reaches parent at tp, contradicting.
-Case t' > tc:
-Using sendrImpNoSendr (above), we know that the requested state must have reached
-at some point t'', tc < t'' <= t'. Since request was sent at tc, the requesting
-state must be greater than the state at tc. This means state at tc is less than
-state at t''. Thus, it must have sent a downgrade response.
-Case 1: t1 > tc:
+messages cannot cross, i.e. it cannot be true that child hasn't received the
+response at any time tc' < tc and parent hasn't received the request at any
+time tp' <= tp.
+Proof: Convert the above property into a property dependent on t, where forall
+tc <= t and tp <= t, the above statement holds. Now we do strong induction on
+t. Assume this property holds for all values < t. We need to prove that this
+property holds at t.
+Parent must have received a request at tp since it can send response only on
+receiving a request. Let this request be sent at t1 <= tp (and hence t1 <= t).
+Case: t1 = tc:
+Must be the same request sent at tc, which was received by parent at tp,
+proving the hypothesis for t.
+Case: t1 > tc:
+Since a second request can be sent only when the child is not waiting, the
+first request must have received an appropriate response after tc. This
+response must be sent before tp because of FIFO property. Let this response be
+sent at t2 < tp (can't be equal to tp because response sent at tp hasn't
+reached yet). So t2 < t.  tc < t1 <= t. So tc < t. Now, the response sent at t2
+hasn't reached at any time tc' < tc.  The request sent at tc hasn't reached at
+any time tp' <= t2. So tc, t2 satisfy induction hypothesis, creating a
+contradiction.
+Case: tc > t1:
+Same argument, switching t1 and tc.
 
-Request at tc must have received a response because child cannot send second request
-while waiting. This response must have been sent by parent before tp (because parent
-to child messages are FIFO). This violates the induction hypothesis.
-Case 2: tc > t1:
-e 1, with t1's response crossing tc's request.
+mainInd:
+a) conservative directory
+b) two responses from parent and child cannot cross, (it cannot be true that
+both are received strictly earlier than when they the other is sent)
+c) younger requests cannot overtake older responses (both sent from child).
+Strictly speaking, it is not possible that a response is sent and a request is
+sent later, and that request has reached but the response hasn't reached
+strictly before the request was reached.
+Proof: Convert the above property into dependent on t, where the times stated
+in the above properties without limits are all <= t. Prove by induction on t.
+Case: t = 0:
+a) Obvious
+b) If parent sends a response in the beginning, then a request and response
+both have to be sent by the child simultaneously which is not possible.
+c) Again, situation will not occur.
+Case: t = t+1, assuming true for t:
+a) There are two ways a directory will not be conservative: either the child
+received an upgrade response while the parent remains same, or the parent
+received downgrade response when the child remains the same. Say the child
+receives an upgrade response. This has to be sent by the parent, and
+afterwards, the parent must have received a downgrade response, violating (b).
+Say the parent receives a downgrade response. This has to be sent by the child,
+and afterwards, the child must have received an upgrade response, violating (b)
+again. So both are not possible.
+c) After the child sends its response, the parent cannot have sent a response
+at >= t1, because that would violate crossing. So the parent can only reduce
+its state. Let t2 be the last response if the parent received any (or t2 = 0)
+before it received the request. Now, the state of the parent after t2 will be
+the state of the child at t1, while the state of the child at the time of
+sending a request will be < state at t1. So, by the inference rule, parent will
+not accept the request, since the from-state of the request will be less than
+the state of the parent.
+b) A request must have triggered a response from parent and it must occur
+before the response from child was sent to not violate (c). According to
+cReqPRespCross, the response from parent must not cross a request from child.
+So, the child cannot get any upgrade response between when it sent a request
+and when it sent a response.  Moreover, it must have been in the waiting state
+since it didn't get any response, which means the child cannot have sent a
+voluntary response. This means that a parent must have sent a request that
+triggered a response from the child. This request must be sent before the
+parent sent its response. The parent must have gotten a response for its
+request because it sent a response for the request sent by the child. Let the
+last such response be sent by the child at t1 which must be before when the
+child sent its crossing response (because of FIFO responses). Now the child
+cannot send or receive any response in between the two responses, so the state
+must match after sending the first response. This means that the child would
+have dropped the request and not send one more response.
 
-Also take care of the case when parent received the first request exactly at tp. Then its
-response must reach at or after tp. And tc <= tp. So tc' cannot be < tc.
+cReqRespSent:
+If a request is sent by the parent at t1 and received by the child at t2, then
+the state of the child at t2 <= to-state of the request means that there must be
+a response sent by the child < t2 whose to-state is less than or equal to that of
+the request.
+Proof: Consider the last state change by the child. Let's say it was because of
+a response received. Then, it must have been sent before the request was sent. Moreover,
+because of cross, the parent cannot of received any response in between the sent response
+and sent request. Moreover, no response was received by the child in between, so it cannot
+be sent in between. The state of the parent at the time of sending the request must be
+the state of the child at the time of receiving the request, which means that the hypothesis
+about state of child at t2 <= to-state is violated.
 
+If the last state if because of sending a response, then the state of the child is the same,
+and it satisfies the hypothesis.
 
-noTwoPResp:
+If no state change occurred, then the parent cannot send a request since the child will be in I
+
+vol:
+If a request is sent by parent (t1) and a response sent by child (t2), if the
+response was received by parent t3 >= t1, and the request was not received by
+the child <= t2, and no request was sent by the parent at t5, t1 < t5 <= t3, if
+some request was received by the child at t2, then the to-state of that request
+must be >= state of the child at t2.
+Proof: Basically, I am sending two requests. So, I must have gotten the
+response before sending the second request. Consider the last such response
+received. No upgrade response must be received by child in the interim because
+that will violate FIFO from parent to child. So, state of the child hasn't
+changed, which means it must drop the request.
+
+pReqsCVolRespReqLt:
+If two requests are sent by parent at <= t, and no request or response in
+between, and both the requests haven't reached the child at <= t, then there
+exists a response sent by the child at t5, received by the parent at t6, t1 <=
+t6 < t2 and forall requests received by the child at t5, the state of the child
+is <= to-state of such a request, and to-state of the original second request
+must be less than the to-state of the response sent at t5.
+Proof: The first part has the same proof as above. We need to prove that the
+to-state of the original second request must be less than the to-state of the
+response sent at t5. Easy, because parent hasn't sent any response between t6
+and t2, and so it can only reduce its state, so to-state of request-2 must be
+less than the to-state of response at t6.
+
+pRecvRespPrevState:
+The state of sending a response and receiving that response is the same, if
+the response is sent by a child.
+Proof: It's how the transition rule is written!
+
+cRecvRespPrevState:
+The state of sending a response and receiving that response is the same, if
+the response is sent by a parent.
+Proof: Consider the last transition by child. Say it is receiving a response,
+then parent must have sent it earlier, and no transition must have occurred in
+parent too (to avoid violating crossing). Say it is sending a response, then
+it must reach parent earlier to avoid crossing and no transition must have
+occurred in parent too (to avoid FIFO response from parent). If no transition
+occurs in child, then no transition would have occurred in parent and hence same.
+
+pRecvDowngrade, cSendDowngrade, pSendUpgrade, pRecvUpgrade:
+Proof: Given by p/cRecvRespPrevState.
+
+pSendCSameState:
+During a response from parent, the state of the child remains constant till
+it reaches the child.
+Proof: It cannot send a response to avoid violating crossing. If it receives
+a response, then since a parent must have received a request, it violates
+cReqPRespCross. So the state remains the same.
+
+pSendPSameState:
+During a response from parent, the state of the parent remains = to-state of
+response till it reaches the child.
+Proof: It cannot receive a response from child to avoid violating crossing. If it
+sends a response, then it must have received a request from child, which violates
+cReqPRespCross. So the state remains the same.
+
+cSendCSmallerState:
+If a response is sent from child, received by parent, then the to-state of the response
+is >= state of the child in the interim.
+Proof: It cannot receive any response to avoid crossing violation.
+
+cSendPGreaterState:
+If a response is sent by a child, received by a parent, then the from-state of the
+response is <= state of the parent in the interim.
+Proof: The child cannot receive any response ...
+
+cSendNonM:
+If a child sends a response, then the state of the child must be less than M in the
+interim.
+Proof: to-state of response >= state of child, and to-state < M.
+
+pRecvNonI:
+If a parent receives a response, then state of parent must be > I in the interim.
+Proof: from-state of response <= state of parent, and from-state > I.
+
+pSendNonI:
+If a parent sends a response, then the state of parent must be > I in the interim.
+Proof: Obvious.
+
+cRecvNonM:
+If a child sends a response, then the state of parent must be < M in the interim.
+Proof: Obvious.
+
+cWaitImpNotRecvOrSent:
+If wait is true at child, there exists a sent request at child, and either the
+request has been received by parent and an appropriate response sent back to child
+which hasn't been received, or the request hasn't been received by parent.
+Proof:
+Definitely some request has to be sent or the wait state will be false.
+Consider the last request sent by child previously.
+Case 1: Request hasn't been received . Qed
+Case 2: Request has been received by parent:
+Parent must send a response. If that response has already been received by child, then
+wait state must become false and no more request has been sent.
+
+pWaitImpNotRecvOrSent:
+Same wrt parent.
+
+pReqRespCDropReq:
+If parent sends response at sm <= t, and it wasn't received by child at any y < t,
+if a request was sent by parent at sr < sm which also wasn't received by child
+at y < t, then state of child at t <= to-state of request.
+Proof: There must be a response sent by child for request sent at sr. Let's say
+that response was sent after t1. Consider the last such response. It cannot
+receive any response from parent to avoid crossing. The state remains the same,
+which is <= to-state of request.
+
+-------------
+
+cReqBadExCResp:
+If a child sends a request at sr < t, and it wasn't received at any y < t,
+either state of parent is <= from-state of request, or there exists another
+response sent < t by child which hasn't been received by parent < t.
+
+cRespBadExCResp:
+If a child sends a response at sr < t, and it wasn't received at any y < t,
+either state of parent is = from-state of response, or there exists another
+response sent < t by child which hasn't been received by parent < t.
+
+cRespGoodNoEarlier:
+If a child sends a response at sr < t, and it wasn't received at any y < t,
+and from-state of response = state of parent, and another response x was
+sent at sx < sr from child, then x must be received by parent at < t.
+
+cRespBadExCGoodResp:
+If a child sends a response at sr < t, and it wasn't received at any y < t,
+if from-state of response != state of parent, there exists a response sent by
+child at sm < sr whose from-state = state of parent and it hasn't been received
+at < t at parent, and every other response sent before sm by child has been
+received by parent.
+
+cRespExCGoodResp:
+If a child sends a response at sr < t, and it wasn't received at any y < t,
+there exists a response sent by parent at sm <= sr such that from-state of
+response = state of parent that hasn't been received at < t at parent, for
+every response sent before sm by child has been received by parent.
+
+cReqBadExCGoodResp:
+If a child sends a request at sr < t, and it wasn't received at any y < t, if
+state of parent > from-state of request, there exists a response sent by child
+at sm < sr such that from-state of response = state of parent at t, and this
+response hasn't been received at < t at parent and for every response sent
+before sm by child has been received by parent.
+
 
 
