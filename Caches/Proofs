@@ -48,14 +48,6 @@ afterwards, the parent must have received a downgrade response, violating (b).
 Say the parent receives a downgrade response. This has to be sent by the child,
 and afterwards, the child must have received an upgrade response, violating (b)
 again. So both are not possible.
-c) After the child sends its response, the parent cannot have sent a response
-at >= t1, because that would violate crossing. So the parent can only reduce
-its state. Let t2 be the last response if the parent received any (or t2 = 0)
-before it received the request. Now, the state of the parent after t2 will be
-the state of the child at t1, while the state of the child at the time of
-sending a request will be < state at t1. So, by the inference rule, parent will
-not accept the request, since the from-state of the request will be less than
-the state of the parent.
 b) A request must have triggered a response from parent and it must occur
 before the response from child was sent to not violate (c). According to
 cReqPRespCross, the response from parent must not cross a request from child.
@@ -71,6 +63,14 @@ child sent its crossing response (because of FIFO responses). Now the child
 cannot send or receive any response in between the two responses, so the state
 must match after sending the first response. This means that the child would
 have dropped the request and not send one more response.
+c) After the child sends its response, the parent cannot have sent a response
+at >= t1, because that would violate crossing. So the parent can only reduce
+its state. Let t2 be the last response if the parent received any (or t2 = 0)
+before it received the request. Now, the state of the parent after t2 will be
+the state of the child at t1, while the state of the child at the time of
+sending a request will be < state at t1. So, by the inference rule, parent will
+not accept the request, since the from-state of the request will be less than
+the state of the parent.
 
 cReqRespSent:
 If a request is sent by the parent at t1 and received by the child at t2, then
@@ -130,50 +130,6 @@ it must reach parent earlier to avoid crossing and no transition must have
 occurred in parent too (to avoid FIFO response from parent). If no transition
 occurs in child, then no transition would have occurred in parent and hence same.
 
-pRecvDowngrade, cSendDowngrade, pSendUpgrade, pRecvUpgrade:
-Proof: Given by p/cRecvRespPrevState.
-
-pSendCSameState:
-During a response from parent, the state of the child remains constant till
-it reaches the child.
-Proof: It cannot send a response to avoid violating crossing. If it receives
-a response, then since a parent must have received a request, it violates
-cReqPRespCross. So the state remains the same.
-
-pSendPSameState:
-During a response from parent, the state of the parent remains = to-state of
-response till it reaches the child.
-Proof: It cannot receive a response from child to avoid violating crossing. If it
-sends a response, then it must have received a request from child, which violates
-cReqPRespCross. So the state remains the same.
-
-cSendCSmallerState:
-If a response is sent from child, received by parent, then the to-state of the response
-is >= state of the child in the interim.
-Proof: It cannot receive any response to avoid crossing violation.
-
-cSendPGreaterState:
-If a response is sent by a child, received by a parent, then the from-state of the
-response is <= state of the parent in the interim.
-Proof: The child cannot receive any response ...
-
-cSendNonM:
-If a child sends a response, then the state of the child must be less than M in the
-interim.
-Proof: to-state of response >= state of child, and to-state < M.
-
-pRecvNonI:
-If a parent receives a response, then state of parent must be > I in the interim.
-Proof: from-state of response <= state of parent, and from-state > I.
-
-pSendNonI:
-If a parent sends a response, then the state of parent must be > I in the interim.
-Proof: Obvious.
-
-cRecvNonM:
-If a child sends a response, then the state of parent must be < M in the interim.
-Proof: Obvious.
-
 cWaitImpNotRecvOrSent:
 If wait is true at child, there exists a sent request at child, and either the
 request has been received by parent and an appropriate response sent back to child
@@ -198,42 +154,97 @@ that response was sent after t1. Consider the last such response. It cannot
 receive any response from parent to avoid crossing. The state remains the same,
 which is <= to-state of request.
 
--------------
-
-cReqBadExCResp:
-If a child sends a request at sr < t, and it wasn't received at any y < t,
-either state of parent is <= from-state of request, or there exists another
-response sent < t by child which hasn't been received by parent < t.
-
 cRespBadExCResp:
 If a child sends a response at sr < t, and it wasn't received at any y < t,
 either state of parent is = from-state of response, or there exists another
-response sent < t by child which hasn't been received by parent < t.
+response sent < sr by child which hasn't been received by parent < t.
+Proof: Consider the case when state of parent <> from-state of response.
+Consider the last state change at parent.
+Case: No state change at parent:
+Child never upgraded, so it cannot send a response.
+Case: It's a downgrade from child:
+Unless the child has downgraded further, the states will match, and the downgrade cannot
+be received before t.
+Case: It's an upgrade from parent:
+Unless the child has downgraded further, the states will match, and the downgrade cannot
+be received before t.
 
 cRespGoodNoEarlier:
 If a child sends a response at sr < t, and it wasn't received at any y < t,
 and from-state of response = state of parent, and another response x was
 sent at sx < sr from child, then x must be received by parent at < t.
+Proof: Proof by contradiction on cRespBadExCResp. Let's say another response
+was not received. Consider the first such response x sent at sx not received by
+parent.  The from-state of this response is > from-state of response sent at sr
+since the child wouldn't receive any response from parent which would violate
+crossing. Hence the from-state of this response sent at sx is not equal to
+state of parent at t. That means that there must be another response sent < sx
+which hasn't been received by parent < t, violating the minimum condition.
 
 cRespBadExCGoodResp:
-If a child sends a response at sr < t, and it wasn't received at any y < t,
-if from-state of response != state of parent, there exists a response sent by
-child at sm < sr whose from-state = state of parent and it hasn't been received
-at < t at parent, and every other response sent before sm by child has been
-received by parent.
+If a child sends a response at sr < t, and it wasn't received at any y < t, if
+from-state of response != state of parent, there exists a response sent by
+child at sm < sr whose from-state = state of parent at t and it hasn't been
+received at < t at parent, and every other response sent before sm by child has
+been received by parent.
+Proof: By cRespBadExCResp, there must be at least one response sent by child at
+< sr not received at < t at parent. Consider the first such responses sent at
+sm. Every response before this has been received by parent. We need to prove that
+from-state of response sent at sm = state of parent at t. Consider the last state
+change at parent.
+Case: No state change at parent:
+Child never upgraded, so it cannot send a response.
+Case: It's a downgrade from child:
+Child cannot get any upgrade message from parent between the case's response and one
+at sm to assert crossing. Any downgrade message cannot reach parent before t, and after t,
+sm is the first such message. So the from-state of sm will match the state of parent at t.
+Case: It's an upgrade from parent:
+Child cannot get any upgrade message from parent. Any downgrade message cannot
+reach parent before t, and after t, sm is the first such message. So the
+from-state of sm will match the state of parent at t.
 
 cRespExCGoodResp:
 If a child sends a response at sr < t, and it wasn't received at any y < t,
 there exists a response sent by parent at sm <= sr such that from-state of
-response = state of parent that hasn't been received at < t at parent, for
+response = state of parent that hasn't been received at < t at parent and
 every response sent before sm by child has been received by parent.
+Proof:
+Case: from-state of response = state of parent:
+Every previous response to sr has been received by parent according to
+cRespGoodNoEarlier.  Response sent at sr hasn't been received, and that's the
+answer.
+Case: from-state of response != state of parent:
+The response given by cRespBadExCGoodResp is the answer.
+
+cReqBadExCResp:
+If a child sends a request at sr < t, and it wasn't received at any y < t,
+either state of parent is <= from-state of request, or there exists another
+response sent < t by child which hasn't been received by parent < t.
+Proof: Consider when state of parent > from-state of request. Consider
+the last state change at parent.
+Case: No state change at parent:
+Parent will remain I which cannot be > from-state of request.
+Case: It's a downgrade from child:
+Subcase1: Response was sent before request by child:
+Unless the child has downgraded further, the states will match, and the
+downgrade cannot be received before t.
+Subcase2: Response was sent after request by child:
+No response must be received by child between the sending of request and
+sending of the subcase's response (otherwise it will violate cReqPRespCross).
+So, state at parent after receiving subcase's response will be strictly lower
+than the from-state of the request.
+Case: It's an upgrade from parent:
+Unless the child has downgraded further, the states will match, and the
+downgrade cannot be received before t.
 
 cReqBadExCGoodResp:
 If a child sends a request at sr < t, and it wasn't received at any y < t, if
 state of parent > from-state of request, there exists a response sent by child
-at sm < sr such that from-state of response = state of parent at t, and this
-response hasn't been received at < t at parent and for every response sent
+at sm < t such that from-state of response = state of parent at t, and this
+response hasn't been received at < t at parent and every response sent
 before sm by child has been received by parent.
-
-
-
+Proof: Using cReqBadExCResp, we know that there is another response sent < t
+which hasn't been received by parent < t. This means there must be another
+response by cRespExCGoodResp, such that from-state of this response = state of
+parent at t, and this response hasn't been received at < t at parent and every
+response sent before sm by child has been received by parent.
