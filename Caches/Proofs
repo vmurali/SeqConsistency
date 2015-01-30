@@ -277,5 +277,19 @@ responses sitting in the output queues are not considered actual responses).
 
 Prove that each input request climbs a lattice
 Proof:
-Invariant: If the request is present in the input queue, then if a node has
-stopped waiting, then it will be in correct state (TOOOO WEAK, MUST STRENGTHEN)
+Invariant1:
+If a request is present in the input queue, and if the corresponding
+request has become READY in a node, and that node has reached correct state
+before, then its ancestors will be in correct state now (though states can change).
+Invariant2: 
+If a request becomes READY in a node, it would have become READY in its parent
+node earlier.
+
+In the current node, at current time, some request has become
+READY in that node and it has earlier reached the correct state. Now it is
+trying to downgrade and go to a bad state.  So the child node has to have
+already downgraded. The child node must have got that request READY previously.
+We just have to prove that it has earlier reached the correct state,
+//or some response
+is pending to child node. If response is pending, so as to not
+violate cross, the current node cannot have downgraded to a bad state...
