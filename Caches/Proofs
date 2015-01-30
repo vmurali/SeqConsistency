@@ -248,3 +248,34 @@ which hasn't been received by parent < t. This means there must be another
 response by cRespExCGoodResp, such that from-state of this response = state of
 parent at t, and this response hasn't been received at < t at parent and every
 response sent before sm by child has been received by parent.
+
+
+Prove that no rule is blocked
+Proof:
+a) cReqBadExCGoodResp and cRespExCGoodResp ensures that whenever any message is
+in flight, then the appropriate response is in flight to trigger a rule (for
+the request case which is not processable, another processable response is
+present)
+b) If messages are in the network and not in the cache's buffer, transfer.
+c) If no response is present, then choose the parent to child request closest
+to the processor (break arbitrarily in case of tie). This request can be
+processed independent of anything (either Drop, or Send Response - response
+should be sendable as no response is present in the system). Wait state will be
+false since there are no requests to or responses from the child
+d) If no such parent to child request is present, choose the child to parent
+request farthest from processor (break ties arbitrarily). This request will
+trigger one of the req-rules. Wait state will be false since there are no
+requests to or responses from the parent.
+For both (c) and (d):
+- in case it sends a response, that can be sent because no response is present
+- in case it sends another request downstream to parent, it can since the
+  requests were empty there
+- in case it sends another request upsteam to children, it can since the
+  request were empty there
+e) If all else fails, at least one of the two methods can fire. (In the above,
+responses sitting in the output queues are not considered actual responses).
+
+Prove that each input request climbs a lattice
+Proof:
+Invariant: If the request is present in the input queue, then if a node has
+stopped waiting, then it will be in correct state (TOOOO WEAK, MUST STRENGTHEN)
