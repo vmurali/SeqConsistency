@@ -1,0 +1,141 @@
+nochangeWait':
+If a request is sent at time t and no response has been received forall ti, t <
+ti <= t+td, such that it is a response for the request, then at (t+S td), wait
+state will be set to that request at ti.
+Proof: Wait changes only on receiving the appropriate response.
+
+sendrImpNoSendr:
+If a request has been sent at t1 and another at t2 > t1, then here exists a
+time t', t1 < t' <= t2, such that the state requested in the first request has
+been reached.
+Proof: Wait is true exactly till appropriate response has been received, and no
+request can be sent while waiting. So, if the second request is sent, then the
+first must have stopped waiting and that means the requested state must have
+been reached.
+
+noChange:
+If no response has been sent or received at tn such that t <= tn < t' and t < t',
+then state at t' = state at t.
+Proof: Obvious.
+
+noChange2:
+If no response has been sent or received at tn such that t <= tn < t' and t <= t',
+then state at t' = state at t.
+Proof: Obvious.
+
+noWaitWaitImpMark:
+If a cache wasn't waiting at t1 but is waiting at t2 > t1, then there exists
+t, t1 <= t < t2, such that a request has been sent and corresponds to an upgrade
+or a downgrade from the state at t, as the case may be.
+Proof: Wait changes only on sending a request, and a request is sent only on
+upgrade or downgrade as the case may be.
+
+noWaitChange:
+If there is no (upgrade or downgrade) request sent in y, t1 <= y < t2,
+t1 <= t2, and no response which corresponds to a wait in the same period, then
+wait remains the same at t1 and t2 (whether it was originally waiting at
+t1 or not).
+Proof: Sending a request and getting a response are the only ways to change a
+wait state.
+
+noWaitSChange:
+If there is no request sent at y, t1 <= y < t2, t1 <= t2, then the state
+a cache is waiting for remains the same.
+Proof: It's a detail where the state a cache is waiting for is updated only
+on sending a request.
+
+waitImpMarkNotRecv:
+If waiting is true at time t , then there exists a previous time sr when a
+request was sent, and forall y, sr < y < t, no request was sent and forall rm,
+sr <= rm < t, if a response is received, then it doesn't correspond to the wait
+response.
+Proof: Obvious.
+
+voluntary:
+At a child, if a request was sent at t, and a response sent at t' > t, (if
+forall tm, t < tm <= t', state at tm < requested upgrade), then there must be a
+request for which the response was sent at time t', and that request must be
+an actual downgrade request, i.e. the cache should be downgrading to handle
+this request
+Proof: Voluntary response can only be sent if it is not waiting for a response,
+and if a request was sent without the state actually upgrading corrsponding to
+that request, then it must be in wait state and hence not able to send voluntary
+response
+
+sendImpNoSendm:
+At a parent, if a request was sent at t1 and a response at time t2 > t1, then
+there exists t', t1 < t' < t2, such that at least the requested state's
+response is received by the parent.
+Proof: A response can be sent by the parent only when it is not waiting for a
+response, so the response for the original request must have returned.
+
+whenChildHighRecvm:
+If a child upgrades, it must have received the appropriate response from the
+parent.
+Proof: Obvious.
+
+whenChildHigh:
+If a child's state is higher at t' > t than it was previously at t, then there
+must be an appropriate response received at t'', t <= t'' < t'.
+Proof: Obvious from whenChildHighRecvm.
+
+whenChildHighConv:
+If a child didn't receive any appropriate response at t'', t <= t'' < t', where
+t' >= t, then its state at t' must be less than or equal to the state at t.
+Proof: Same as above, add the case when t' = t.
+
+dirRecvImpLow:
+When a parent receives a response, then the directory state downgrades
+Proof: Obvious.
+
+whenDirLow: (and its converse)
+When a directory is higher at t' than at t, where t <= t', then there exists a
+response sent by parent at t'', t <= t'' < t'.
+Proof: Obvious.
+
+dirCantGoLower:
+If the directory state at t is greater than x, then if (no response was sent
+or no response to state less than or equal to x received) at time tn,
+t <= tn < t1, t <= t1, then, directory state at t1 is greater than x.
+Proof: Obvious.
+
+pRespFifo:
+Parent to child responses are in FIFO order.
+Proof: Obvious
+
+cReqPRespCross:
+Given tc, tp, child sent request at tc, parent sent response at tp, then these
+messages cannot cross, i.e. it cannot be true that child hasn't received the response
+at any time tc' < tc and parent hasn't received the request at any time tp' <= tp.
+Proof: Use strong induction on t such that tc, tp both <= t.
+Assume for all values < t.
+Case: t=0:
+Parent must have received a request at 0, since it can send response only
+on receiving a request. This request must be sent at 0. Since the original request
+is sent at 0, they must be the same and parent receives it at 0, contradicting
+the condition.
+Case: t > 0:
+Let the request corresponding to the response that the parent sent be sent by
+child at t'.
+Case t' = tc:
+Again, this must be the same request, which reaches parent at tp, contradicting.
+Case t' > tc:
+Using sendrImpNoSendr (above), we know that the requested state must have reached
+at some point t'', tc < t'' <= t'. Since request was sent at tc, the requesting
+state must be greater than the state at tc. This means state at tc is less than
+state at t''. Thus, it must have sent a downgrade response.
+Case 1: t1 > tc:
+
+Request at tc must have received a response because child cannot send second request
+while waiting. This response must have been sent by parent before tp (because parent
+to child messages are FIFO). This violates the induction hypothesis.
+Case 2: tc > t1:
+e 1, with t1's response crossing tc's request.
+
+Also take care of the case when parent received the first request exactly at tp. Then its
+response must reach at or after tp. And tc <= tp. So tc' cannot be < tc.
+
+
+noTwoPResp:
+
+
