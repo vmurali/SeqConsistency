@@ -277,19 +277,31 @@ responses sitting in the output queues are not considered actual responses).
 
 Prove that each input request climbs a lattice
 Proof:
+Invariant0: (no induction)
+A request that became READY will remain so until a response has been sent.
 Invariant1:
-If a request is present in the input queue, and if the corresponding
-request has become READY in a node, and that node has reached correct state
-before, then its ancestors will be in correct state now (though states can change).
-Invariant2: 
+If a request is present in the input queue, and if the corresponding request
+has become READY in a node, and that node has reached correct sub-state before,
+then its ancestors will be in correct sub-state now (though states can change).
+Invariant2: (no induction) 
 If a request becomes READY in a node, it would have become READY in its parent
 node earlier.
 
-In the current node, at current time, some request has become
-READY in that node and it has earlier reached the correct state. Now it is
-trying to downgrade and go to a bad state.  So the child node has to have
-already downgraded. The child node must have got that request READY previously.
-We just have to prove that it has earlier reached the correct state,
-//or some response
-is pending to child node. If response is pending, so as to not
-violate cross, the current node cannot have downgraded to a bad state...
+In the current node, at current time, some request is READY in that node and it
+has earlier reached the correct sub-state for a few sub-states. Let's say the
+current transition changes real state from correct to uncorrect. That means
+that a previous transition must have changed directory state from correct to
+uncorrect which is not possible by induction hypothesis. Let's say the
+directory state changes from correct to uncorrect. That means that it must have
+gotten a response making it downgrade. If this response was sent by the child
+before the request was sent, then it must have been received before the request
+was received making it downgrade before the request was READY, contradicting
+the premise. So this response must be sent after the child sent the request.
+This means that the child node must have downgraded from a correct state to
+an uncorrect state after the request has become READY (which must be earlier
+according to Invariant2), which contradicts induction hypothesis.
+
+Proof for Invariant2: A request in a parent can become READY only after it was
+received. A request can be sent by a child to parent only after some request in
+the child becomes READY. So the child node must have a request READY earlier.
+
