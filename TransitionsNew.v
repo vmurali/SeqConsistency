@@ -430,7 +430,6 @@ Section ComplexSimulate.
       pose proof (@notIoEqExistRec n) as u1.
       pose proof (decIo (getTransA1Io (getStreamATrans sa1b1 n))
                         (getTransA2Io (convertA1ToA2 n))) as [eq|ne].
-      About ABTrans.
       apply (ABTrans getTransA2Io getTransB2Io _ _ (convertA1ToA2 n) _ _
             (getStreamTransition sb2 n)).
       rewrite <- eq.
@@ -442,7 +441,6 @@ Section ComplexSimulate.
       auto.
       specialize (u1 ne).
       destruct u1 as [x e].
-      About ABTrans.
       apply (ABTrans getTransA2Io getTransB2Io _ _ (convertA1ToA2 n) _ _ x e).
     Qed.
 
@@ -510,5 +508,3 @@ Section ComplexSimulate.
     Qed.
   End StatesMatch.
 End ComplexSimulate.
-
-About statesMatch.

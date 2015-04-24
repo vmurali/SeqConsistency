@@ -1,7 +1,5 @@
 Require Import SeqConsistency.StoreAtomicity SeqConsistency.FreshNew Caches.Top SeqConsistency.TransitionsNew Caches.Rules SeqConsistency.DataTypes.
 
-About statesMatchFinal.
-
 Section Merge.
   Definition Addr := Caches.DataTypes.Addr.
   Definition Data := Caches.DataTypes.Data.
@@ -46,7 +44,6 @@ Section Merge.
                                      nextPpc set get.
 
   Definition stateA1ToA2 := @stateA1ToA2 Addr Data Proc Pc PState Rob Ppc.
-  About stMatch.
 
   Variable pc0: Pc.
   Variable state0: PState.
@@ -70,15 +67,9 @@ Section Merge.
                      Transition initGlobalState cstm getCacheIo
                      (cacheIsStoreAtomic).
 
-  About stMatch.
-  About simulateImProof.
-
-  About buildIm.
-
   Definition buildIm := @buildIm Addr Data Proc decAddr initData GlobalState Transition
                                  initGlobalState cstm getCacheIo 0.
 
-  About buildImSimulate.
   Definition buildImSimulate := @buildImSimulate Addr Data Proc zero decAddr initData
                                                  GlobalState Transition initGlobalState
                                                  cstm getCacheIo cacheIsStoreAtomic.
@@ -89,8 +80,6 @@ Section Merge.
              empty add getLoad issueLoad updLoad commit nextPpc set get rob0 ppc0
              GlobalState initGlobalState Transition getCacheIo sa1b1
              buildIm buildImSimulate.
-
-  About finalTheorem.
 End Merge.
 
 About finalTheorem.

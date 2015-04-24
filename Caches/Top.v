@@ -53,7 +53,6 @@ Set Implicit Arguments.
   Qed.
 
 
-  About StoreAtomicity.
   Theorem cacheIsStoreAtomic : StoreAtomicity zero initData cstm getCacheIo.
   Proof.
     assert  (forall (t: Time) (a : Addr) (c : Tree) (d ld : Data),
@@ -108,8 +107,6 @@ Set Implicit Arguments.
     rewrite <- H1 in H0.
     pose proof (@storeAtomicitySt' t a c d ld H0).
     intuition.
-
-    About Build_StoreAtomicity.
 
     apply (Build_StoreAtomicity zero initData _ _ H great).
   Qed.
