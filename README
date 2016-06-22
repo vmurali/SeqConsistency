@@ -1,0 +1,53 @@
+This repository contains the proof of a full system implementing sequential
+consistency. The proof is modular in the sense that we prove that an arbitrary
+tree hierarchy of caches implements an instantaneous atomic memory, and a
+speculative out-of-order processor implements an instantaneous atomic
+processor. The final theorem states that when multiple such speculative
+processors are connected to the hierarchy of caches, then it implements several
+atomic processors connected to memory.
+
+The cache proof is present in the cache folder. BaseTree.v and Tree.v files
+contains the inductive definition for trees and the cache hierarchies are
+instances of trees. Tree.v is a named version of BaseTree with each node having
+a name computed based on the position of the node w.r.t. root of the tree.
+Hier.v and HierProperties.v contains a list of properties about tree
+hierarchies.  Caches/DataTypes.v and MsiState.v contains the definition of some
+of the datatypes used in the caches. Cache.v contains the invariants related to
+internal caches and the root while L1.v and LatestValue.v contains the
+invariants related to the leaf caches. CommonBeh record inside Cache.v captures
+the trivial invariants that can be obtained by simply examining the state
+transitions of the caches (given in Rules.v), and the proofs of these trivial
+invariants are in BehaviorAxioms.v. LatestValue.v contains theorems which
+pertain to establishing that any non-I address in a cache contains the latest
+value (given by the last store from any processor to that address).
+LatestValueAxiom.v proves some helper theorems in LatestValue.v file.
+Channel.v defines the communication channel between the caches, represented
+using unbounded lists. ChannelAxiom.v and ChannelAxiomHelp.v contains
+invariants regarding the channels. Top.v assembles the whole system by
+combining the internal caches with the L1 caches and the channels and proves
+the store-atomicity theorem (which states that any load reads the latest store
+from any processor).
+
+TransitionsNew.v in the top-level directory defines the semantics of the
+transition system and the speculative processor is implemented in FreshNew.v.
+The speculative processor's implementation is not concrete -- it abstracts
+over the ISA and does not have a concrete implementation of a reorder buffer
+or branch predictors (instead their behaviors are encapsulated directly in the
+preconditions in the state transitions). StoreAtomicity.v shows that any
+system that obeys the store-atomicity theorem implements instantaneous memory,
+where loads read values from the memory instantaneously and stores update the
+corresponding location instantaneously.
+
+Useful.v and Caches.Useful.v contain useful generic lemmas which are used at
+various places in this project (e.g. facts about lists that are not present in
+the standard library).
+
+Two things to note:
+a) When this framework was being developed, I did not know much about proof
+automation, so most of the proofs contain a lot of tedious details spelt out.
+Moreover, I was also learning Coq at that point, so things could have been
+designed differently if I were to start it again (which is what I am doing with
+Kami).
+b) The Processor part and the Cache part were developed completely
+orthogonally, with no foreseen plan to integrate them. So a lot of code has
+been copied and pasted between these two parts.
